@@ -3,7 +3,7 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+	//"fmt"
 )
 
 func Serialize(data interface{}) []byte {
