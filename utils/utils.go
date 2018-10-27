@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"simpledfs/daemon"
 )
 
 func Serialize(data interface{}) []byte {
