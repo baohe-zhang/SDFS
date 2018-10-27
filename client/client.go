@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 )
@@ -8,20 +9,29 @@ import (
 // Usage of correct client command
 func usage() {
 	fmt.Println("Usage of ./client")
-	fmt.Println("    put [localfilename] [sdfsfilename]")
-	fmt.Println("    get [sdfsfilename] [localfilename]")
-	fmt.Println("    delete [sdfsfilename]")
-	fmt.Println("    ls [sdfsfilename]")
-	fmt.Println("    store")
-	fmt.Println("    get-versions [sdfsfilename] [num-versions] [localfilename]")
+	fmt.Println("   -master=[master IP:Port] put [localfilename] [sdfsfilename]")
+	fmt.Println("   -master=[master IP:Port] get [sdfsfilename] [localfilename]")
+	fmt.Println("   -master=[master IP:Port] delete [sdfsfilename]")
+	fmt.Println("   -master=[master IP:Port] ls [sdfsfilename]")
+	fmt.Println("   -master=[master IP:Port] store")
+	fmt.Println("   -master=[master IP:Port] get-versions [sdfsfilename] [num-versions] [localfilename]")
+}
+
+func contactMaster(masterIP string) {
+
 }
 
 func main() {
+	// If no command line arguments, return
 	if len(os.Args) <= 1 {
 		usage()
 		return
 	}
-	args := os.Args[1:]
+	ipPtr := flag.String("master", "xx.xx.xx.xx", "Master's IP address")
+	flag.Parse()
+	masterIP := *ipPtr
+	fmt.Println("Master IP address ", masterIP)
+	args := flag.Args()
 
 	command := args[0]
 	switch command {
@@ -65,4 +75,11 @@ func main() {
 		usage()
 	}
 
+}
+
+// Helper function to print the err in process
+func printError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "\n[ERROR]", err.Error())
+	}
 }
