@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"bytes"
@@ -19,16 +19,16 @@ func Deserialize(data []byte, sample interface{}) {
 }
 
 // Test client
-func main() {
-	putReq := daemon.PutRequest{
-		Filesize: uint32(10240),
-	}
-	copy(putReq.Filename[:], "myFilename")
+// func main() {
+// 	putReq := daemon.PutRequest{
+// 		Filesize: uint32(10240),
+// 	}
+// 	copy(putReq.Filename[:], "myFilename")
 
-	b := Serialize(putReq)
-	fmt.Printf("%v", b)
+// 	b := Serialize(putReq)
+// 	fmt.Printf("%v", b)
 
-	s := daemon.PutRequest{}
-	Deserialize(b, &s)
-	fmt.Println(s.Filesize)
-}
+// 	s := daemon.PutRequest{}
+// 	Deserialize(b, &s)
+// 	fmt.Println(s.Filesize)
+// }
