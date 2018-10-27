@@ -3,7 +3,7 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
-	//"fmt"
+	"fmt"
 )
 
 func Serialize(data interface{}) []byte {
@@ -15,6 +15,12 @@ func Serialize(data interface{}) []byte {
 func Deserialize(data []byte, sample interface{}) {
 	buf := bytes.NewReader(data)
 	binary.Read(buf, binary.BigEndian, sample)
+}
+
+func ParseFilename(data [128]byte) string {
+	n := bytes.IndexByte([]byte(data[:]), 0)
+	filename := fmt.Sprintf("%s", data[:n])
+	return filename
 }
 
 // Test client
