@@ -20,7 +20,7 @@ type PutResponse struct {
 	DataNodeList [NumReplica]uint8
 }
 
-type PutAcknowledge struct {
+type PutConfirm struct {
 }
 
 type WriteRequest struct {
@@ -30,7 +30,7 @@ type WriteRequest struct {
 	DataNodeList [NumReplica]uint8
 }
 
-type WriteResponse struct {
+type WriteConfirm struct {
 	Filename  [128]byte
 	Filesize  uint64
 	Timestamp uint64
