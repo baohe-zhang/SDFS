@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"crypto/sha256"
 )
 
 func Serialize(data interface{}) []byte {
@@ -23,7 +24,19 @@ func ParseFilename(data [128]byte) string {
 	return filename
 }
 
-// Test client
+func HashFilename(filename string) [32]byte {
+	hash := sha256.Sum256([]byte(filename))
+	return hash
+}
+
+// Test HashFilename
+// func main() {
+// 	filename := "user/hello.txt"
+// 	fmt.Println(len(HashFilename(filename)))
+// 	fmt.Printf("%x", HashFilename(filename))
+// }
+
+// Test Serialize(), Deserialize()
 // func main() {
 // 	putReq := daemon.PutRequest{
 // 		Filesize: uint32(10240),
