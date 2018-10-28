@@ -19,7 +19,7 @@ type PutRequest struct {
 
 type PutResponse struct {
 	MsgType      uint8
-	Filename     [128]byte
+	FilenameHash [32]byte
 	Filesize     uint64
 	Timestamp    uint64
 	NexthopIP    uint32
@@ -32,16 +32,16 @@ type PutConfirm struct {
 
 type WriteRequest struct {
 	MsgType      uint8
-	Filename     [128]byte
+	FilenameHash [32]byte
 	Filesize     uint64
 	Timestamp    uint64
 	DataNodeList [NumReplica]uint8
 }
 
 type WriteConfirm struct {
-	MsgType   uint8
-	Filename  [128]byte
-	Filesize  uint64
-	Timestamp uint64
-	DataNode  uint8
+	MsgType      uint8
+	FilenameHash [32]byte
+	Filesize     uint64
+	Timestamp    uint64
+	DataNode     uint8
 }
