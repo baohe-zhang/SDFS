@@ -3,7 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
+	"net"
 	"os"
+	"simpledfs/utils"
+	"time"
+)
+
+const (
+	BufferSize = 4096
 )
 
 // Usage of correct client command
@@ -17,8 +25,73 @@ func usage() {
 	fmt.Println("   -master=[master IP:Port] get-versions [sdfsfilename] [num-versions] [localfilename]")
 }
 
-func contactMaster(masterIP string) {
+func contactNode(addr string) (net.Conn, error) {
+	// Time out needed in order to deal with server failure.
+	conn, err := net.DialTimeout("tcp", addr, time.Second)
+	printError(err)
+	return conn, err
+}
 
+func fileTransfer(pr utils.PutResponse, localfile string) {
+	port := utils.StringPort(pr.NexthopPort)
+	ip := utils.StringIP(pr.NexthopIP)
+
+	conn, err := net.Dial("tcp", ip+":"+port)
+	utils.PrintError(err)
+	defer conn.Close()
+
+	file, err := os.Open(localfile)
+	utils.PrintError(err)
+
+	wr := utils.WriteRequest{MsgType: utils.WriteRequestMsg}
+	wr.FilenameHash = pr.FilenameHash
+	wr.Filesize = pr.Filesize
+	wr.Timestamp = pr.Timestamp
+	wr.DataNodeList = pr.DataNodeList
+	bin := utils.Serialize(wr)
+	_, err = conn.Write(bin)
+	utils.PrintError(err)
+
+	buf := make([]byte, BufferSize)
+
+	n, err := conn.Read(buf)
+	for string(buf[:n]) != "OK" {
+	}
+	fmt.Println(string(buf[:n]))
+
+	buf = make([]byte, BufferSize)
+	for {
+		n, err := file.Read(buf)
+		conn.Write(buf[:n])
+		if err == io.EOF {
+			fmt.Println("Send file finish")
+			break
+		}
+	}
+}
+
+// Put command execution for simpleDFS client
+func putCommand(masterConn net.Conn, sdfsfile string, filesize uint64, localfile string) {
+	prPacket := utils.PutRequest{MsgType: utils.PutRequestMsg, Filesize: filesize}
+	copy(prPacket.Filename[:], sdfsfile)
+
+	bin := utils.Serialize(prPacket)
+	_, err := masterConn.Write(bin)
+	printErrorExit(err)
+
+	buf := make([]byte, BufferSize)
+	n, err := masterConn.Read(buf)
+	printErrorExit(err)
+
+	response := utils.PutResponse{}
+	utils.Deserialize(buf[:n], &response)
+	if response.MsgType != utils.PutResponseMsg {
+		fmt.Println("Unexpected message from MasterNode")
+		return
+	}
+	fmt.Printf("%s %d %v\n", utils.Hash2Text(response.FilenameHash[:]), response.Timestamp, response.DataNodeList)
+
+	fileTransfer(response, localfile)
 }
 
 func main() {
@@ -27,12 +100,16 @@ func main() {
 		usage()
 		return
 	}
-	ipPtr := flag.String("master", "xx.xx.xx.xx", "Master's IP address")
+	ipPtr := flag.String("master", "xx.xx.xx.xx:port", "Master's IP:Port address")
 	flag.Parse()
-	masterIP := *ipPtr
-	fmt.Println("Master IP address ", masterIP)
-	args := flag.Args()
+	masterAddr := *ipPtr
+	fmt.Println("Master IP:Port address ", masterAddr)
+	masterConn, err := contactNode(masterAddr)
+	if err != nil {
+		return
+	}
 
+	args := flag.Args()
 	command := args[0]
 	switch command {
 	case "put":
@@ -41,6 +118,15 @@ func main() {
 			usage()
 		}
 		fmt.Println(args[1:])
+		localfile := args[1]
+		sdfsfile := args[2]
+		filenode, err := os.Stat(localfile)
+		if err != nil {
+			printError(err)
+			return
+		}
+		fmt.Println(filenode.Size(), sdfsfile)
+		putCommand(masterConn, sdfsfile, uint64(filenode.Size()), localfile)
 	case "get":
 		if len(args) != 3 {
 			fmt.Println("Invalid get usage")
@@ -81,5 +167,14 @@ func main() {
 func printError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "\n[ERROR]", err.Error())
+		fmt.Println(" ")
+	}
+}
+
+func printErrorExit(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "\n[ERROR]\n", err.Error())
+		fmt.Println(" ")
+		os.Exit(1)
 	}
 }
