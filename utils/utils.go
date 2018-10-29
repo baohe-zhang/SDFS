@@ -2,10 +2,14 @@ package utils
 
 import (
 	"bytes"
-	"encoding/binary"
-	"fmt"
 	"crypto/sha256"
+	"encoding/base64"
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"hash/fnv"
 	"net"
+	"os"
 )
 
 func Serialize(data interface{}) []byte {
@@ -19,8 +23,8 @@ func Deserialize(data []byte, sample interface{}) {
 	binary.Read(buf, binary.BigEndian, sample)
 }
 
-func ParseFilename(data [128]byte) string {
-	n := bytes.IndexByte([]byte(data[:]), 0)
+func ParseFilename(data []byte) string {
+	n := bytes.IndexByte(data, 0)
 	filename := fmt.Sprintf("%s", data[:n])
 	return filename
 }
@@ -28,6 +32,10 @@ func ParseFilename(data [128]byte) string {
 func HashFilename(filename string) [32]byte {
 	hash := sha256.Sum256([]byte(filename))
 	return hash
+}
+
+func Hash2Text(hashcode []byte) string {
+	return base64.URLEncoding.EncodeToString(hashcode)
 }
 
 func BinaryIP(IP string) uint32 {
@@ -40,7 +48,48 @@ func StringIP(binIP uint32) string {
 	return IP.String()
 }
 
-// Test BinaryIP() 
+func StringPort(binPort uint16) string {
+	return fmt.Sprint(binPort)
+}
+
+// Helper function to generate a certain range of replica for a specific filename
+func HashReplicaRange(filename string, capacity uint32) ([NumReplica]uint8, error) {
+	var res [NumReplica]uint8
+	if capacity <= 0 {
+		return res, errors.New("Capacity is lower than 1")
+	}
+	h := fnv.New32a()
+	h.Write([]byte(filename))
+	hashcode := h.Sum32()
+
+	start := (hashcode + 5) >> 5 % capacity
+	end := start + NumReplica
+	fmt.Println(start, end)
+	for i := start; i < end; i++ {
+		res[i-start] = uint8(i % capacity)
+	}
+	return res, nil
+}
+
+// Helper function to print the err in process
+func PrintError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "\n[ERROR]", err.Error())
+		fmt.Println(" ")
+	}
+}
+
+// A trick to simply get local IP address
+func GetLocalIP() net.IP {
+	dial, err := net.Dial("udp", "8.8.8.8:80")
+	PrintError(err)
+	localAddr := dial.LocalAddr().(*net.UDPAddr)
+	dial.Close()
+
+	return localAddr.IP
+}
+
+// Test BinaryIP()
 // func main() {
 // 	b := BinaryIP("10.193.185.82")
 // 	fmt.Printf("%x\n", b)
