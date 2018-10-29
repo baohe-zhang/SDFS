@@ -7,14 +7,14 @@ import (
 	// "time"
 	"sync"
 	// "bytes"
-	"os"
 	"io"
+	"os"
 )
 
 var wg sync.WaitGroup
 
 const (
-	NodeID = 1
+	NodeID     = 1
 	BufferSize = 4096
 )
 
@@ -31,70 +31,47 @@ func listener() {
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-		go fileReader(conn)
+		//go fileReader(conn)
+		go handler(conn)
 	}
 }
 
-// func handler(conn net.Conn) {
-// 	defer conn.Close()
+func handler(conn net.Conn) {
+	defer conn.Close()
 
-// 	buf := make([]byte, BufferSize)
-// 	n, err := conn.Read(buf)
-// 	if err != nil {
-// 		fmt.Println(err.Error())
-// 	}
+	buf := make([]byte, BufferSize)
+	n, err := conn.Read(buf)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 
-// 	if buf[0]&utils.WriteRequestMsg != 0 {
-// 		// Receive write request
-// 		msg := utils.WriteRequest{}
-// 		utils.Deserialize(buf[:n], &msg)
+	if buf[0]&utils.WriteRequestMsg != 0 {
+		// Receive write request
+		msg := utils.WriteRequest{}
+		utils.Deserialize(buf[:n], &msg)
 
-// 		filenameHash := msg.FilenameHash
-// 		filesize := msg.Filesize
-// 		timestamp := msg.Timestamp
-// 		dataNodeList := msg.DataNodeList
+		filenameHash := msg.FilenameHash
+		filesize := msg.Filesize
+		//timestamp := msg.Timestamp
+		//dataNodeList := msg.DataNodeList
 
-// 		// Create file io
-// 		filename := fmt.Sprintf("%x", filenameHash)
-// 		file, err := os.Create(filename)
-// 		if err != nil {
-// 			fmt.Println(err.Error())
-// 		}
-// 		defer file.Close()
+		// Create file io
+		//filename := fmt.Sprintf("%x", filenameHash)
+		filename := utils.Hash2Text(filenameHash[:])
+		fileReader(conn, filename, filesize)
+	}
+}
 
-// 		// Ready to receive file
-// 		conn.Write([]byte("OK"))
-
-// 		buf = buf[:0] // Clear buffer
-// 		var receivedBytes uint64
-
-// 		for {
-// 			n, err := conn.Read(buf)
-// 			if (err != nil) {
-// 				fmt.Println(err.Error())
-// 			}
-// 			file.Write(buf)
-// 			receivedBytes += uint64(n)
-// 			if (receivedBytes == filesize) {
-// 				fmt.Printf("Received file with %d bytes", filesize)
-// 				break
-// 			}
-// 		}
-// 	}
-// }
-
-func fileReader(conn net.Conn) {
+func fileReader(conn net.Conn, filename string, filesize uint64) {
 	// Create file io
-	filename1 := "copyfile1.mov"
-	file1, err := os.Create(filename1)
+	file1, err := os.Create(filename)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 	defer file1.Close()
 
 	// Create file io
-	filename2 := "copyfile2.mov"
-	file2, err := os.Create(filename2)
+	file2, err := os.Create(filename + "_copy")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
@@ -116,6 +93,10 @@ func fileReader(conn net.Conn) {
 			break
 		}
 	}
+
+	if filesize != receivedBytes {
+		fmt.Println("Unmatched two files")
+	}
 }
 
 func fileSender() {
@@ -134,7 +115,8 @@ func fileSender() {
 	buf := make([]byte, BufferSize)
 
 	n, err := conn.Read(buf)
-	for string(buf[:n]) != "OK" {}
+	for string(buf[:n]) != "OK" {
+	}
 	fmt.Println(string(buf[:n]))
 
 	buf = make([]byte, BufferSize)
@@ -148,7 +130,6 @@ func fileSender() {
 		}
 	}
 }
-
 
 func dialMasterNode(masterID uint8, filenameHash [32]byte, filesize uint64, timestamp uint64) {
 	conn, err := net.Dial("tcp", ":8000")
@@ -190,7 +171,7 @@ func main() {
 	go listener()
 
 	wg.Wait()
-	fileSender()
+	//fileSender()
 
 	select {}
 }
