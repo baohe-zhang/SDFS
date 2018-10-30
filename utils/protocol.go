@@ -4,11 +4,14 @@ import ()
 
 const (
 	NumReplica      = 4
-	PutRequestMsg   = 0x01
-	PutResponseMsg  = 0x01 << 1
-	PutConfirmMsg   = 0x01 << 2
-	WriteRequestMsg = 0x01 << 3
-	WriteConfirmMsg = 0x01 << 4
+	PutRequestMsg   = 1
+	PutResponseMsg  = 2
+	PutConfirmMsg   = 3
+	WriteRequestMsg = 4
+	WriteConfirmMsg = 5
+	GetRequestMsg   = 6
+	GetResponseMsg  = 7
+	ReadRequestMsg  = 8
 )
 
 type PutRequest struct {
