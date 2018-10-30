@@ -7,11 +7,25 @@ import (
 	// "time"
 	"sync"
 	// "bytes"
+	"errors"
 	"io"
 	"os"
 )
 
 var wg sync.WaitGroup
+
+var MemberList = [...]string{
+	"fa18-cs425-g29-01.cs.illinois.edu",
+	"fa18-cs425-g29-02.cs.illinois.edu",
+	"fa18-cs425-g29-03.cs.illinois.edu",
+	"fa18-cs425-g29-04.cs.illinois.edu",
+	"fa18-cs425-g29-05.cs.illinois.edu",
+	"fa18-cs425-g29-06.cs.illinois.edu",
+	"fa18-cs425-g29-07.cs.illinois.edu",
+	"fa18-cs425-g29-08.cs.illinois.edu",
+	"fa18-cs425-g29-09.cs.illinois.edu",
+	"fa18-cs425-g29-10.cs.illinois.edu",
+}
 
 const (
 	NodeID     = 1
@@ -31,7 +45,6 @@ func listener() {
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-		//go fileReader(conn)
 		go handler(conn)
 	}
 }
@@ -50,32 +63,34 @@ func handler(conn net.Conn) {
 		msg := utils.WriteRequest{}
 		utils.Deserialize(buf[:n], &msg)
 
-		filenameHash := msg.FilenameHash
-		filesize := msg.Filesize
-		//timestamp := msg.Timestamp
-		//dataNodeList := msg.DataNodeList
-
 		// Create file io
-		//filename := fmt.Sprintf("%x", filenameHash)
-		filename := utils.Hash2Text(filenameHash[:])
-		fileReader(conn, filename, filesize)
+		fileReader(conn, msg)
 	}
 }
 
-func fileReader(conn net.Conn, filename string, filesize uint64) {
-	// Create file io
-	file1, err := os.Create(filename)
-	if err != nil {
-		fmt.Println(err.Error())
+func fileReader(conn net.Conn, wr utils.WriteRequest) {
+	filesize := wr.Filesize
+	filename := utils.Hash2Text(wr.FilenameHash[:])
+
+	var hasLocalFile bool
+	var file1 *os.File
+	hasLocalFile = true
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		fmt.Println("File does not exist and will be created")
+		hasLocalFile = false
+		// Create file io
+		file1, err = os.Create(filename)
+		utils.PrintError(err)
 	}
 	defer file1.Close()
 
-	// Create file io
-	file2, err := os.Create(filename + "_copy")
+	var hasNextNode bool
+	hasNextNode = true
+	connNextNode, err := dialDataNodePut(wr)
 	if err != nil {
-		fmt.Println(err.Error())
+		utils.PrintError(err)
+		hasNextNode = false
 	}
-	defer file2.Close()
 
 	// Ready to receive file
 	conn.Write([]byte("OK"))
@@ -85,8 +100,12 @@ func fileReader(conn net.Conn, filename string, filesize uint64) {
 
 	for {
 		n, err := conn.Read(buf)
-		file1.Write(buf[:n])
-		file2.Write(buf[:n])
+		if !hasLocalFile {
+			file1.Write(buf[:n])
+		}
+		if hasNextNode {
+			(*connNextNode).Write(buf[:n])
+		}
 		receivedBytes += uint64(n)
 		if err == io.EOF {
 			fmt.Printf("receive file with %d bytes\n", receivedBytes)
@@ -113,7 +132,6 @@ func fileSender() {
 	}
 
 	buf := make([]byte, BufferSize)
-
 	n, err := conn.Read(buf)
 	for string(buf[:n]) != "OK" {
 	}
@@ -129,6 +147,23 @@ func fileSender() {
 			break
 		}
 	}
+}
+
+func findNexthop(nodeList []uint8) int {
+	for k, v := range nodeList {
+		if v != 0 {
+			return k
+		}
+	}
+	return -1
+}
+
+func getNodeIP(nodeid uint8) string {
+	return MemberList[nodeid]
+}
+
+func getNodePort(nodeid uint8) string {
+	return "8000"
 }
 
 func dialMasterNode(masterID uint8, filenameHash [32]byte, filesize uint64, timestamp uint64) {
@@ -148,21 +183,27 @@ func dialMasterNode(masterID uint8, filenameHash [32]byte, filesize uint64, time
 	conn.Write(utils.Serialize(wc))
 }
 
-func dialDataNode(datanodeID uint8, filenameHash [32]byte, filesize uint64, timestamp uint64, dataNodeList [utils.NumReplica]uint8) {
-	conn, err := net.Dial("tcp", ":8000")
-	if err != nil {
-		fmt.Println(err.Error())
+func dialDataNodePut(wr utils.WriteRequest) (*net.Conn, error) {
+	nextIndex := findNexthop(wr.DataNodeList[:])
+	if nextIndex == -1 {
+		return nil, errors.New("Empty DataNodeList")
 	}
 
-	wr := utils.WriteRequest{
-		MsgType:      utils.WriteRequestMsg,
-		FilenameHash: filenameHash,
-		Filesize:     filesize,
-		Timestamp:    timestamp,
-		DataNodeList: dataNodeList,
+	conn, err := net.Dial("tcp", getNodeIP(wr.DataNodeList[nextIndex])+":"+getNodePort(wr.DataNodeList[nextIndex]))
+	if err != nil {
+		return &conn, err
 	}
+	wr.DataNodeList[nextIndex] = 0
 
 	conn.Write(utils.Serialize(wr))
+
+	buf := make([]byte, BufferSize)
+	n, err := conn.Read(buf)
+	for string(buf[:n]) != "OK" {
+	}
+	fmt.Println(string(buf[:n]))
+
+	return &conn, nil
 }
 
 func main() {
