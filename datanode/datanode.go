@@ -130,11 +130,12 @@ func fileSender() {
 	if err != nil {
 		fmt.Println(err.Error())
 	}
+	defer file.Close()
 
 	buf := make([]byte, BufferSize)
 	n, err := conn.Read(buf)
-	for string(buf[:n]) != "OK" {
-	}
+	
+	for string(buf[:n]) != "OK" {}
 	fmt.Println(string(buf[:n]))
 
 	buf = make([]byte, BufferSize)
