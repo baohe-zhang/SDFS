@@ -45,3 +45,22 @@ type WriteConfirm struct {
 	Timestamp    uint64
 	DataNode     uint8
 }
+
+type GetRequest struct {
+	MsgType  uint8
+	Filename [128]byte
+}
+
+type GetResponse struct {
+	MsgType          uint8
+	FilenameHash     [32]byte
+	Filesize         uint64
+	NodeNum          uint8
+	DataNodeIPList   [NumReplica]uint32
+	DataNodePortList [NumReplica]uint16
+}
+
+type ReadRequest struct {
+	MsgType      uint8
+	FilenameHash [32]byte
+}
