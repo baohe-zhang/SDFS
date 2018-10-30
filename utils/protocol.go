@@ -58,7 +58,6 @@ type GetResponse struct {
 	MsgType          uint8
 	FilenameHash     [32]byte
 	Filesize         uint64
-	NodeNum          uint8
 	DataNodeIPList   [NumReplica]uint32
 	DataNodePortList [NumReplica]uint16
 }
