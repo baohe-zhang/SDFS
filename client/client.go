@@ -37,7 +37,10 @@ func fileTransfer(pr utils.PutResponse, localfile string) {
 	ip := utils.StringIP(pr.NexthopIP)
 
 	conn, err := net.Dial("tcp", ip+":"+port)
-	utils.PrintError(err)
+	if err != nil {
+		utils.PrintError(err)
+		return
+	}
 	defer conn.Close()
 
 	file, err := os.Open(localfile)
@@ -48,6 +51,8 @@ func fileTransfer(pr utils.PutResponse, localfile string) {
 	wr.Filesize = pr.Filesize
 	wr.Timestamp = pr.Timestamp
 	wr.DataNodeList = pr.DataNodeList
+	wr.DataNodeList[0] = 0
+
 	bin := utils.Serialize(wr)
 	_, err = conn.Write(bin)
 	utils.PrintError(err)
