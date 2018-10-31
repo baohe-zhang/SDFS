@@ -98,7 +98,7 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 		hasNextNode = false
 	}
 
-	fmt.Println("next node addr: ", (*nextNodeConn).RemoteAddr().String())
+	//fmt.Println("next node addr: ", (*nextNodeConn).RemoteAddr().String())
 
 	// Ready to receive file
 	conn.Write([]byte("OK"))
@@ -128,7 +128,7 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 	} else {
 		info := utils.Info{
 			Timestamp: wr.Timestamp,
-			Filesize: wr.Filesize,
+			Filesize:  wr.Filesize,
 			DataNodes: wr.DataNodeList[:],
 		}
 		meta.PutFileInfo(filename, info)
@@ -156,7 +156,8 @@ func fileWriter(conn net.Conn, rr utils.ReadRequest) {
 	buf := make([]byte, BufferSize)
 	n, err := conn.Read(buf)
 
-	for string(buf[:n]) != "OK" {}
+	for string(buf[:n]) != "OK" {
+	}
 	fmt.Println("client ready to receive file")
 
 	buf = make([]byte, BufferSize)
@@ -206,7 +207,8 @@ func dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 	// Wait for next hop's reply
 	buf := make([]byte, BufferSize)
 	n, err := conn.Read(buf)
-	for string(buf[:n]) != "OK" {}
+	for string(buf[:n]) != "OK" {
+	}
 	fmt.Printf("node %d ready to receive file", nodeID)
 
 	return &conn, nil
@@ -215,10 +217,12 @@ func dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 // Return the first non-zero nodeID's index
 func getNexthopID(nodeList []uint8) (uint8, error) {
 	for k, v := range nodeList {
-		if v == NodeID && k < len(nodeList) - 1 {
+		fmt.Println("NodeID ", k, v)
+		if v == NodeID && k < len(nodeList)-1 {
 			return nodeList[k+1], nil
 		}
 	}
+	fmt.Println("NodeID ", NodeID)
 	return 255, errors.New("Nexthop doesn't exists")
 }
 
@@ -239,12 +243,11 @@ func getNodeID(hostname string) (uint8, error) {
 	return 255, errors.New("hostname doesn't match any nodeID")
 }
 
-
 func main() {
 	NodeID, err := getNodeID(utils.GetLocalHostname())
 	if err != nil {
 		fmt.Println(err.Error())
-		return 
+		return
 	}
 
 	fmt.Println("Node ID: ", NodeID)
