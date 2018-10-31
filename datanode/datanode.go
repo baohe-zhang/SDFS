@@ -182,12 +182,12 @@ func dialMasterNode(masterID uint8, filenameHash [32]byte, filesize uint64, time
 }
 
 func dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
-	nodeID, err := findNexthop(wr.DataNodeList[:])
+	nodeID, err := getNexthopID(wr.DataNodeList[:])
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := net.Dial("tcp", getNodeIP(wr.DataNodeList[nodeID])+":"+getNodePort(wr.DataNodeList[nodeID]))
+	conn, err := net.Dial("tcp", getNodeIP(nodeID)+":"+getNodePort(nodeID))
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 }
 
 // Return the first non-zero nodeID's index
-func findNexthop(nodeList []uint8) (uint8, error) {
+func getNexthopID(nodeList []uint8) (uint8, error) {
 	for k, v := range nodeList {
 		if v == NodeID && k < len(nodeList) - 1 {
 			return nodeList[k+1], nil
