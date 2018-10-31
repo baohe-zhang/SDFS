@@ -41,7 +41,7 @@ func (meta Meta) StoreMeta(filename string) {
 	defer file.Close()
 
 	b, _ := json.Marshal(meta)
-	file.Write(b)
+	file.Write(b[:])
 }
 
 func (meta Meta) FileInfo(filename string) Info {
