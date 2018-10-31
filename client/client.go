@@ -51,7 +51,7 @@ func filePut(pr utils.PutResponse, localfile string) {
 	wr.Filesize = pr.Filesize
 	wr.Timestamp = pr.Timestamp
 	wr.DataNodeList = pr.DataNodeList
-	wr.DataNodeList[0] = 0
+	//wr.DataNodeList[0] = 0
 
 	bin := utils.Serialize(wr)
 	_, err = conn.Write(bin)
