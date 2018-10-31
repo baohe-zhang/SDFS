@@ -37,10 +37,27 @@ func (meta Meta) FileInfo(filename string) Info {
 
 func (meta Meta) PutFileInfo(filename string, info Info) {
 	meta[filename] = append(meta[filename], info)
+	meta.SortFileInfo(filename)
 }
 
 func (meta Meta) SortFileInfo(filename string) {
-	
+	infos := meta[filename]
+	n := len(infos)
+
+	// Bubble Sort
+	swapped := false
+	for i := 0; i < n - 1; i++ {
+		swapped = false
+		for j := 0; j < n - 1 - i; j++ {
+			if infos[j].Timestamp < infos[j+1].Timestamp {
+				infos[j], infos[j+1] = infos[j+1], infos[j]
+				swapped = true
+			}
+		}
+		if !swapped {
+			break
+		}
+	}
 }
 
 
@@ -56,8 +73,7 @@ func main() {
 	}
 
 	meta.PutFileInfo("file1", info)
-
-	fmt.Println(meta["file1"][3])
+	fmt.Println(meta["file1"])
 }
 
 
