@@ -44,7 +44,7 @@ func (mn *masterNode) HandlePutRequest(prMsg utils.PutRequest, conn net.Conn) {
 	dnList, err := utils.HashReplicaRange(filename, 10)
 	utils.PrintError(err)
 	pr.DataNodeList = dnList
-	pr.NexthopIP = utils.BinaryIP(utils.GetLocalIP().String())
+	pr.NexthopIP = utils.BinaryIP(utils.LookupIP(MemberList[dnList[0]]))
 	pr.NexthopPort = uint16(8000)
 
 	bin := utils.Serialize(pr)
