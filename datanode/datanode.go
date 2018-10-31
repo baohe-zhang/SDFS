@@ -132,6 +132,7 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 			DataNodes: wr.DataNodeList[:],
 		}
 		meta.PutFileInfo(_filename, info)
+		meta.StoreMeta("meta.json")
 		fmt.Printf("put %s with ts %d into meta list", _filename, wr.Timestamp)
 
 		// Tell master it receives a file
@@ -252,7 +253,7 @@ func main() {
 
 	fmt.Println("Node ID: ", NodeID)
 
-	meta = utils.Meta{}
+	meta = utils.NewMeta("meta.json")
 
 	go listener()
 

@@ -18,9 +18,11 @@ type Info struct {
 }
 
 func NewMeta(filename string) Meta {
-	file, err := os.Open(filename)
-	if err != nil {
-		fmt.Println(err.Error())
+	var file *os.File
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		file, _ = os.Create(filename)
+	} else {
+		file, _ = os.Open(filename)
 	}
 	defer file.Close()
 
@@ -29,6 +31,17 @@ func NewMeta(filename string) Meta {
 	json.Unmarshal(b, &meta)
 
 	return meta
+}
+
+func (meta Meta) StoreMeta(filename string) {
+	file, err := os.Open(filename)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	defer file.Close()
+
+	b, _ := json.Marshal(meta)
+	file.Write(b)
 }
 
 func (meta Meta) FileInfo(filename string) Info {
