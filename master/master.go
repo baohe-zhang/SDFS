@@ -7,6 +7,21 @@ import (
 	"time"
 )
 
+var MemberList = [...]string{
+	"fa18-cs425-g29-01.cs.illinois.edu",
+	"fa18-cs425-g29-02.cs.illinois.edu",
+	"fa18-cs425-g29-03.cs.illinois.edu",
+	"fa18-cs425-g29-04.cs.illinois.edu",
+	"fa18-cs425-g29-05.cs.illinois.edu",
+	"fa18-cs425-g29-06.cs.illinois.edu",
+	"fa18-cs425-g29-07.cs.illinois.edu",
+	"fa18-cs425-g29-08.cs.illinois.edu",
+	"fa18-cs425-g29-09.cs.illinois.edu",
+	"fa18-cs425-g29-10.cs.illinois.edu",
+}
+
+var meta utils.Meta
+
 type masterNode struct {
 	Port string
 }
@@ -34,13 +49,41 @@ func (mn *masterNode) HandlePutRequest(prMsg utils.PutRequest, conn net.Conn) {
 
 	bin := utils.Serialize(pr)
 	conn.Write(bin)
+
+	info := utils.Info{Timestamp: pr.Timestamp, Filesize: pr.Filesize, DataNodes: pr.DataNodeList[:]}
+	meta.PutFileInfo(utils.Hash2Text(pr.FilenameHash[:]), info)
+	return
 }
 
 func (mn *masterNode) HandleWriteConfirm(wcMsg utils.WriteConfirm, conn net.Conn) {
 
 }
 
-func (mn *masterNode) handle(conn net.Conn) {
+func (mn *masterNode) HandleGetRequest(grMsg utils.GetRequest, conn net.Conn) {
+	filename := utils.ParseFilename(grMsg.Filename[:])
+	fmt.Println("filename ", filename)
+
+	gr := utils.GetResponse{MsgType: utils.GetResponseMsg}
+	gr.FilenameHash = utils.HashFilename(filename)
+	fmt.Println(utils.Hash2Text(gr.FilenameHash[:]))
+	info := meta.FileInfo(utils.Hash2Text(gr.FilenameHash[:]))
+	gr.Filesize = info.Filesize
+	nodeIPs := [utils.NumReplica]uint32{}
+	nodePorts := [utils.NumReplica]uint16{}
+	for k, v := range info.DataNodes {
+		nodeIPs[k] = utils.BinaryIP(MemberList[v])
+		nodePorts[k] = 8000
+	}
+	gr.DataNodeIPList = nodeIPs
+	gr.DataNodePortList = nodePorts
+
+	bin := utils.Serialize(gr)
+	conn.Write(bin)
+
+	return
+}
+
+func (mn *masterNode) Handle(conn net.Conn) {
 	buf := make([]byte, 4096)
 	n, err := conn.Read(buf)
 	fmt.Println(n)
@@ -55,12 +98,18 @@ func (mn *masterNode) handle(conn net.Conn) {
 		wc := utils.WriteConfirm{}
 		utils.Deserialize(buf[:n], &wc)
 		mn.HandleWriteConfirm(wc, conn)
+	case utils.GetRequestMsg:
+		gr := utils.GetRequest{}
+		utils.Deserialize(buf[:n], &gr)
+		mn.HandleGetRequest(gr, conn)
 	default:
 		fmt.Println("Unrecognized packet")
 	}
 }
 
 func (mn *masterNode) start() {
+	meta = utils.NewMeta("MasterMeta")
+
 	listener, err := net.Listen("tcp", ":"+mn.Port)
 	if err != nil {
 		// handle error
@@ -71,7 +120,7 @@ func (mn *masterNode) start() {
 		if err != nil {
 			// handle error
 		}
-		go mn.handle(conn)
+		go mn.Handle(conn)
 	}
 }
 

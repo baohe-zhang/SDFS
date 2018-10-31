@@ -68,7 +68,6 @@ func HashReplicaRange(filename string, capacity uint32) ([NumReplica]uint8, erro
 
 	start := (hashcode + 5) >> 5 % capacity
 	end := start + NumReplica
-	fmt.Println(start, end)
 	for i := start; i < end; i++ {
 		res[i-start] = uint8(i % capacity)
 	}

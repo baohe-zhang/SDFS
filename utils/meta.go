@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"encoding/json"
@@ -46,9 +46,9 @@ func (meta Meta) SortFileInfo(filename string) {
 
 	// Bubble Sort
 	swapped := false
-	for i := 0; i < n - 1; i++ {
+	for i := 0; i < n-1; i++ {
 		swapped = false
-		for j := 0; j < n - 1 - i; j++ {
+		for j := 0; j < n-1-i; j++ {
 			if infos[j].Timestamp < infos[j+1].Timestamp {
 				infos[j], infos[j+1] = infos[j+1], infos[j]
 				swapped = true
@@ -60,22 +60,18 @@ func (meta Meta) SortFileInfo(filename string) {
 	}
 }
 
-
-
 // Test client
+/*
 func main() {
 	meta := NewMeta("meta3.json")
 
 	info := Info{
 		Timestamp: 20,
-		Filesize: 32,
-		DataNodes: []uint8{1,2,3,4},
+		Filesize:  32,
+		DataNodes: []uint8{1, 2, 3, 4},
 	}
 
 	meta.PutFileInfo("file1", info)
 	fmt.Println(meta["file1"])
 }
-
-
-
-
+*/

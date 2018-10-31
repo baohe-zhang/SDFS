@@ -32,7 +32,7 @@ func contactNode(addr string) (net.Conn, error) {
 	return conn, err
 }
 
-func fileTransfer(pr utils.PutResponse, localfile string) {
+func filePut(pr utils.PutResponse, localfile string) {
 	port := utils.StringPort(pr.NexthopPort)
 	ip := utils.StringIP(pr.NexthopIP)
 
@@ -75,6 +75,54 @@ func fileTransfer(pr utils.PutResponse, localfile string) {
 	}
 }
 
+func fileGet(gr utils.GetResponse, localfile string) {
+	var conn net.Conn
+	hasConn := false
+	for index, ip := range gr.DataNodeIPList {
+		conn, err := net.Dial("tcp", utils.StringIP(ip)+":"+fmt.Sprintf("%d", gr.DataNodePortList[index]))
+		utils.PrintError(err)
+		if err == nil {
+			hasConn = true
+			break
+		}
+		defer conn.Close()
+	}
+	if hasConn == false {
+		fmt.Println("Cannot dial all datanodes")
+		return
+	}
+
+	file, err := os.Open(localfile)
+	utils.PrintError(err)
+
+	rr := utils.ReadRequest{MsgType: utils.ReadRequestMsg}
+	rr.FilenameHash = gr.FilenameHash
+
+	bin := utils.Serialize(rr)
+	_, err = conn.Write(bin)
+	utils.PrintError(err)
+
+	conn.Write([]byte("OK"))
+
+	buf := make([]byte, BufferSize)
+	var receivedBytes uint64
+
+	for {
+		n, err := conn.Read(buf)
+		file.Write(buf[:n])
+		receivedBytes += uint64(n)
+		if err == io.EOF {
+			fmt.Printf("Receive file with %d bytes\n", receivedBytes)
+			break
+		}
+
+	}
+
+	if gr.Filesize != receivedBytes {
+		fmt.Println("Unmatched two files")
+	}
+}
+
 // Put command execution for simpleDFS client
 func putCommand(masterConn net.Conn, sdfsfile string, filesize uint64, localfile string) {
 	prPacket := utils.PutRequest{MsgType: utils.PutRequestMsg, Filesize: filesize}
@@ -96,7 +144,30 @@ func putCommand(masterConn net.Conn, sdfsfile string, filesize uint64, localfile
 	}
 	fmt.Printf("%s %d %v\n", utils.Hash2Text(response.FilenameHash[:]), response.Timestamp, response.DataNodeList)
 
-	fileTransfer(response, localfile)
+	filePut(response, localfile)
+}
+
+// Get command execution for simpleDFS client
+func getCommand(masterConn net.Conn, sdfsfile string, localfile string) {
+	grPacket := utils.GetRequest{MsgType: utils.GetRequestMsg}
+	copy(grPacket.Filename[:], sdfsfile)
+
+	bin := utils.Serialize(grPacket)
+	_, err := masterConn.Write(bin)
+	printErrorExit(err)
+
+	buf := make([]byte, BufferSize)
+	n, err := masterConn.Read(buf)
+	printErrorExit(err)
+
+	response := utils.GetResponse{}
+	utils.Deserialize(buf[:n], &response)
+	if response.MsgType != utils.GetResponseMsg {
+		fmt.Println("Unexpected message from MasterNode")
+		return
+	}
+
+	fileGet(response, localfile)
 }
 
 func main() {
@@ -138,6 +209,9 @@ func main() {
 			usage()
 		}
 		fmt.Println(args[1:])
+		sdfsfile := args[1]
+		localfile := args[2]
+		getCommand(masterConn, sdfsfile, localfile)
 	case "delete":
 		if len(args) != 2 {
 			fmt.Println("Invalid delete usage")
