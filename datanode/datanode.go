@@ -12,6 +12,7 @@ import (
 	"os"
 )
 
+var NodeID uint8
 var meta utils.Meta
 
 var MemberList = [...]string{
@@ -28,7 +29,6 @@ var MemberList = [...]string{
 }
 
 const (
-	NodeID     = 1
 	BufferSize = 4096
 )
 
@@ -121,6 +121,13 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 	// File size check
 	if receivedBytes != filesize {
 		fmt.Println("file size unmatch")
+	} else {
+		// info := utils.Info{
+		// 	Timestamp: ,
+		// 	Filesize: filesize,
+		// 	DataNode: ,
+		// }
+		// meta.PutFileInfo(filename, info)
 	}
 }
 
@@ -175,17 +182,15 @@ func dialMasterNode(masterID uint8, filenameHash [32]byte, filesize uint64, time
 }
 
 func dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
-	nodeID := findNexthop(wr.DataNodeList[:])
-	if nodeID == -1 {
-		return nil, errors.New("Empty DataNodeList")
+	nodeID, err := findNexthop(wr.DataNodeList[:])
+	if err != nil {
+		return nil, err
 	}
 
 	conn, err := net.Dial("tcp", getNodeIP(wr.DataNodeList[nodeID])+":"+getNodePort(wr.DataNodeList[nodeID]))
 	if err != nil {
-		return &conn, err
+		return nil, err
 	}
-	// Clear nexthop in the node list
-	wr.DataNodeList[nodeID] = 0
 
 	// Send write request to the next hop
 	conn.Write(utils.Serialize(wr))
@@ -200,26 +205,43 @@ func dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 }
 
 // Return the first non-zero nodeID's index
-func findNexthop(nodeList []uint8) int {
+func findNexthop(nodeList []uint8) (uint8, error) {
 	for k, v := range nodeList {
-		if v != 0 {
-			return k
+		if v == NodeID && k < len(nodeList) - 1 {
+			return nodeList[k+1], nil
 		}
 	}
-	return -1
+	return 255, errors.New("Nexthop doesn't exists")
 }
 
-func getNodeIP(nodeid uint8) string {
-	return MemberList[nodeid]
+func getNodeIP(nodeID uint8) string {
+	return MemberList[nodeID]
 }
 
-func getNodePort(nodeid uint8) string {
+func getNodePort(nodeID uint8) string {
 	return "8000"
 }
 
-func main() {
+func getNodeID(hostname string) (uint8, error) {
+	for k, v := range MemberList {
+		if hostname == v {
+			return uint8(k), nil
+		}
+	}
+	return 255, errors.New("hostname doesn't match any nodeID")
+}
 
-	meta = utils.NewMeta("meta3.json")
+
+func main() {
+	NodeID, err := getNodeID(utils.GetLocalHostname())
+	if err != nil {
+		fmt.Println(err.Error())
+		return 
+	}
+
+	fmt.Println("Node ID: ", NodeID)
+
+	meta = utils.Meta{}
 
 	go listener()
 
