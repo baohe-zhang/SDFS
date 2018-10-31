@@ -33,14 +33,16 @@ func NewMasterNode(port string) *masterNode {
 
 func (mn *masterNode) HandlePutRequest(prMsg utils.PutRequest, conn net.Conn) {
 	filename := utils.ParseFilename(prMsg.Filename[:])
-	fmt.Println("filename ", filename)
-	fmt.Println("filesize ", prMsg.Filesize)
+	timestamp := time.Now().UnixNano()
+	fmt.Println("filename: ", filename)
+	fmt.Println("timestamp: ", timestamp)
+	fmt.Println("filesize: ", prMsg.Filesize)
 
 	pr := utils.PutResponse{MsgType: utils.PutResponseMsg}
 	pr.FilenameHash = utils.HashFilename(filename)
 	fmt.Println(utils.Hash2Text(pr.FilenameHash[:]))
 	pr.Filesize = prMsg.Filesize
-	pr.Timestamp = uint64(time.Now().UnixNano())
+	pr.Timestamp = uint64(timestamp)
 	dnList, err := utils.HashReplicaRange(filename, 10)
 	utils.PrintError(err)
 	pr.DataNodeList = dnList
