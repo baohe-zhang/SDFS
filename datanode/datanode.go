@@ -122,12 +122,12 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 	if receivedBytes != filesize {
 		fmt.Println("file size unmatch")
 	} else {
-		// info := utils.Info{
-		// 	Timestamp: ,
-		// 	Filesize: filesize,
-		// 	DataNode: ,
-		// }
-		// meta.PutFileInfo(filename, info)
+		info := utils.Info{
+			Timestamp: wr.Timestamp,
+			Filesize: wr.Filesize,
+			DataNodes: wr.DataNodeList[:],
+		}
+		meta.PutFileInfo(filename, info)
 	}
 }
 
