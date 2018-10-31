@@ -108,6 +108,15 @@ func GetLocalHostname() string {
 	return hostname
 }
 
+func LookupIP(hostname string) string {
+	addrs, err := net.LookupHost(hostname)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	return addrs[0]
+}
+
 // Test BinaryIP()
 // func main() {
 // 	b := BinaryIP("10.193.185.82")
