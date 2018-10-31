@@ -96,9 +96,9 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 	if err != nil {
 		fmt.Println(err.Error())
 		hasNextNode = false
+	} else {
+		fmt.Println("next node addr: ", (*nextNodeConn).RemoteAddr().String())
 	}
-
-	//fmt.Println("next node addr: ", (*nextNodeConn).RemoteAddr().String())
 
 	// Ready to receive file
 	conn.Write([]byte("OK"))
@@ -217,12 +217,10 @@ func dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 // Return the first non-zero nodeID's index
 func getNexthopID(nodeList []uint8) (uint8, error) {
 	for k, v := range nodeList {
-		fmt.Println("NodeID ", k, v)
 		if v == NodeID && k < len(nodeList)-1 {
 			return nodeList[k+1], nil
 		}
 	}
-	fmt.Println("NodeID ", NodeID)
 	return 255, errors.New("Nexthop doesn't exists")
 }
 
@@ -244,7 +242,8 @@ func getNodeID(hostname string) (uint8, error) {
 }
 
 func main() {
-	NodeID, err := getNodeID(utils.GetLocalHostname())
+	var err error
+	NodeID, err = getNodeID(utils.GetLocalHostname())
 	if err != nil {
 		fmt.Println(err.Error())
 		return
