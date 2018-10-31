@@ -1,4 +1,4 @@
-package utils
+package main
 
 import (
 	"bytes"
@@ -32,6 +32,10 @@ func ParseFilename(data []byte) string {
 func HashFilename(filename string) [32]byte {
 	hash := sha256.Sum256([]byte(filename))
 	return hash
+}
+
+func StringHashFilename(hash []byte) string {
+	return fmt.Sprintf("%x", hash)
 }
 
 func Hash2Text(hashcode []byte) string {
