@@ -77,9 +77,9 @@ func handler(conn net.Conn) {
 func fileReader(conn net.Conn, wr utils.WriteRequest) {
 	filesize := wr.Filesize
 	// Create local filename from write request
-	filename := utils.Hash2Text(wr.FilenameHash[:])
+	_filename := utils.Hash2Text(wr.FilenameHash[:])
 	timestamp := fmt.Sprintf("%d", wr.Timestamp)
-	filename = filename + ":" + timestamp
+	filename := _filename + ":" + timestamp
 
 	fmt.Println("filename: ", filename)
 
@@ -131,7 +131,8 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 			Filesize:  wr.Filesize,
 			DataNodes: wr.DataNodeList[:],
 		}
-		meta.PutFileInfo(filename, info)
+		meta.PutFileInfo(_filename, info)
+		fmt.Printf("put %s with ts %d into meta list", _filename, wr.Timestamp)
 
 		// Tell master it receives a file
 		// dialMasterNode()
