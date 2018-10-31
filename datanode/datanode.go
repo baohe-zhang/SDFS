@@ -94,6 +94,8 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 	if err != nil {
 		fmt.Println(err.Error())
 		hasNextNode = false
+	} else {
+		defer (*nextNodeConn).Close()
 	}
 
 	// Ready to receive file
@@ -128,6 +130,9 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 			DataNodes: wr.DataNodeList[:],
 		}
 		meta.PutFileInfo(filename, info)
+
+		// Tell master it receives a file
+		// dialMasterNode()
 	}
 }
 
@@ -169,6 +174,7 @@ func dialMasterNode(masterID uint8, filenameHash [32]byte, filesize uint64, time
 	if err != nil {
 		fmt.Println(err.Error())
 	}
+	defer conn.Close()
 
 	wc := utils.WriteConfirm{
 		MsgType:      utils.WriteConfirmMsg,
