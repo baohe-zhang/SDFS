@@ -5,14 +5,14 @@ import (
 	"net"
 	"simpledfs/utils"
 	// "time"
-	"sync"
+	// "sync"
 	// "bytes"
 	"errors"
 	"io"
 	"os"
 )
 
-var wg sync.WaitGroup
+var meta utils.Meta
 
 var MemberList = [...]string{
 	"fa18-cs425-g29-01.cs.illinois.edu",
@@ -38,7 +38,6 @@ func listener() {
 		fmt.Println(err.Error())
 	}
 	defer ln.Close()
-	wg.Done()
 
 	for {
 		conn, err := ln.Accept()
@@ -59,73 +58,81 @@ func handler(conn net.Conn) {
 	}
 
 	if buf[0]&utils.WriteRequestMsg != 0 {
-		// Receive write request
+		// Receive write request from client
 		msg := utils.WriteRequest{}
 		utils.Deserialize(buf[:n], &msg)
 
-		// Create file io
 		fileReader(conn, msg)
+
+	} else if buf[0]&utils.ReadRequestMsg != 0 {
+		// Receive read request from client
+		msg := utils.ReadRequest{}
+		utils.Deserialize(buf[:n], &msg)
+
+		fileWriter(conn, msg)
 	}
 }
 
+// Receive remote file from cleint, store it in local and send it to next hop if possible
 func fileReader(conn net.Conn, wr utils.WriteRequest) {
 	filesize := wr.Filesize
+	// Create local filename from write request
 	filename := utils.Hash2Text(wr.FilenameHash[:])
+	timestamp := fmt.Sprintf("%d", wr.Timestamp)
+	filename = filename + ":" + timestamp
 
-	var hasLocalFile bool
-	var file1 *os.File
-	hasLocalFile = true
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		fmt.Println("File does not exist and will be created")
-		hasLocalFile = false
-		// Create file io
-		file1, err = os.Create(filename)
-		utils.PrintError(err)
-	}
-	defer file1.Close()
-
-	var hasNextNode bool
-	hasNextNode = true
-	connNextNode, err := dialDataNodePut(wr)
+	// Create file descriptor
+	file, err := os.Create(filename)
 	if err != nil {
-		utils.PrintError(err)
+		fmt.Println(err.Error())
+	}
+	defer file.Close()
+
+	// Check whether next node exists
+	hasNextNode := true
+	nextNodeConn, err := dialDataNode(wr)
+	if err != nil {
+		fmt.Println(err.Error())
 		hasNextNode = false
 	}
 
 	// Ready to receive file
 	conn.Write([]byte("OK"))
 
+	// Read file data from connection and write to local
 	buf := make([]byte, BufferSize)
 	var receivedBytes uint64
-
 	for {
 		n, err := conn.Read(buf)
-		if !hasLocalFile {
-			file1.Write(buf[:n])
-		}
-		if hasNextNode {
-			(*connNextNode).Write(buf[:n])
-		}
+		file.Write(buf[:n])
 		receivedBytes += uint64(n)
+
+		// Send file data to next node
+		if hasNextNode {
+			(*nextNodeConn).Write(buf[:n])
+		}
+
 		if err == io.EOF {
-			fmt.Printf("receive file with %d bytes\n", receivedBytes)
+			fmt.Printf("receive file %s finish\n", filename)
 			break
 		}
 	}
 
-	if filesize != receivedBytes {
-		fmt.Println("Unmatched two files")
+	// File size check
+	if receivedBytes != filesize {
+		fmt.Println("file size unmatch")
 	}
 }
 
-func fileSender() {
-	conn, err := net.Dial("tcp", ":8000")
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	defer conn.Close()
+// Send local file to client
+func fileWriter(conn net.Conn, rr utils.ReadRequest) {
+	// Retrieve local filename from read request and meta data
+	filename := utils.Hash2Text(rr.FilenameHash[:])
+	info := meta.FileInfo(filename)
+	timestamp := fmt.Sprintf("%d", info.Timestamp)
+	filename = filename + ":" + timestamp
 
-	filename := "file.mov"
+	// Send file to client
 	file, err := os.Open(filename)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -134,9 +141,9 @@ func fileSender() {
 
 	buf := make([]byte, BufferSize)
 	n, err := conn.Read(buf)
-	
+
 	for string(buf[:n]) != "OK" {}
-	fmt.Println(string(buf[:n]))
+	fmt.Println("client ready to receive file")
 
 	buf = make([]byte, BufferSize)
 
@@ -144,27 +151,10 @@ func fileSender() {
 		n, err := file.Read(buf)
 		conn.Write(buf[:n])
 		if err == io.EOF {
-			fmt.Printf("send file finish\n")
+			fmt.Printf("send file %s finish\n", filename)
 			break
 		}
 	}
-}
-
-func findNexthop(nodeList []uint8) int {
-	for k, v := range nodeList {
-		if v != 0 {
-			return k
-		}
-	}
-	return -1
-}
-
-func getNodeIP(nodeid uint8) string {
-	return MemberList[nodeid]
-}
-
-func getNodePort(nodeid uint8) string {
-	return "8000"
 }
 
 func dialMasterNode(masterID uint8, filenameHash [32]byte, filesize uint64, timestamp uint64) {
@@ -184,36 +174,54 @@ func dialMasterNode(masterID uint8, filenameHash [32]byte, filesize uint64, time
 	conn.Write(utils.Serialize(wc))
 }
 
-func dialDataNodePut(wr utils.WriteRequest) (*net.Conn, error) {
-	nextIndex := findNexthop(wr.DataNodeList[:])
-	if nextIndex == -1 {
+func dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
+	nodeID := findNexthop(wr.DataNodeList[:])
+	if nodeID == -1 {
 		return nil, errors.New("Empty DataNodeList")
 	}
 
-	conn, err := net.Dial("tcp", getNodeIP(wr.DataNodeList[nextIndex])+":"+getNodePort(wr.DataNodeList[nextIndex]))
+	conn, err := net.Dial("tcp", getNodeIP(wr.DataNodeList[nodeID])+":"+getNodePort(wr.DataNodeList[nodeID]))
 	if err != nil {
 		return &conn, err
 	}
-	wr.DataNodeList[nextIndex] = 0
+	// Clear nexthop in the node list
+	wr.DataNodeList[nodeID] = 0
 
+	// Send write request to the next hop
 	conn.Write(utils.Serialize(wr))
 
+	// Wait for next hop's reply
 	buf := make([]byte, BufferSize)
 	n, err := conn.Read(buf)
-	for string(buf[:n]) != "OK" {
-	}
-	fmt.Println(string(buf[:n]))
+	for string(buf[:n]) != "OK" {}
+	fmt.Printf("node %d ready to receive file", nodeID)
 
 	return &conn, nil
 }
 
+// Return the first non-zero nodeID's index
+func findNexthop(nodeList []uint8) int {
+	for k, v := range nodeList {
+		if v != 0 {
+			return k
+		}
+	}
+	return -1
+}
+
+func getNodeIP(nodeid uint8) string {
+	return MemberList[nodeid]
+}
+
+func getNodePort(nodeid uint8) string {
+	return "8000"
+}
+
 func main() {
 
-	wg.Add(1)
-	go listener()
+	meta = utils.NewMeta("meta3.json")
 
-	wg.Wait()
-	//fileSender()
+	go listener()
 
 	select {}
 }
