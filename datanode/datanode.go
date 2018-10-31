@@ -96,9 +96,9 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 	if err != nil {
 		fmt.Println(err.Error())
 		hasNextNode = false
+	} else {
+		fmt.Println("next node addr: ", (*nextNodeConn).RemoteAddr().String())
 	}
-
-	fmt.Println("next node addr: ", (*nextNodeConn).RemoteAddr().String())
 
 	// Ready to receive file
 	conn.Write([]byte("OK"))
@@ -241,7 +241,8 @@ func getNodeID(hostname string) (uint8, error) {
 
 
 func main() {
-	NodeID, err := getNodeID(utils.GetLocalHostname())
+	var err error
+	NodeID, err = getNodeID(utils.GetLocalHostname())
 	if err != nil {
 		fmt.Println(err.Error())
 		return 
