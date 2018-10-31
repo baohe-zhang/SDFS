@@ -81,6 +81,8 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 	timestamp := fmt.Sprintf("%d", wr.Timestamp)
 	filename = filename + ":" + timestamp
 
+	fmt.Println("filename: ", filename)
+
 	// Create file descriptor
 	file, err := os.Create(filename)
 	if err != nil {
@@ -94,9 +96,9 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 	if err != nil {
 		fmt.Println(err.Error())
 		hasNextNode = false
-	} else {
-		defer (*nextNodeConn).Close()
 	}
+
+	fmt.Println("next node addr: ", (*nextNodeConn).RemoteAddr().String())
 
 	// Ready to receive file
 	conn.Write([]byte("OK"))
