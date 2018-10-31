@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"hash/fnv"
 	"net"
 	"os"
+	"os/exec"
 )
 
 func Serialize(data interface{}) []byte {
@@ -90,6 +91,21 @@ func GetLocalIP() net.IP {
 	dial.Close()
 
 	return localAddr.IP
+}
+
+// Return local FQDN
+func GetLocalHostname() string {
+	cmd := exec.Command("/bin/hostname", "-f")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+	    fmt.Println(err.Error())
+	}
+	hostname := out.String()
+	hostname = hostname[:len(hostname)-1] // removing EOL
+
+	return hostname
 }
 
 // Test BinaryIP()
