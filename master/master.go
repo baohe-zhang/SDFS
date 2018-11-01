@@ -34,10 +34,16 @@ func (mn *masterNode) HandlePutRequest(prMsg utils.PutRequest, conn net.Conn) {
 	pr.Filesize = prMsg.Filesize
 	pr.Timestamp = uint64(timestamp)
 	dnList, err := utils.HashReplicaRange(filename, uint32(mn.MemberList.Size()))
-	for k, v := range dnList {
-		pr.DataNodeList[k] = utils.NodeID{Timestamp: mn.MemberList.Members[v].TimeStamp, IP: mn.MemberList.Members[v].IP}
-	}
 	utils.PrintError(err)
+	for k, v := range dnList {
+		m, err := mn.MemberList.RetrieveByIdx(v)
+		if err != nil {
+			utils.PrintError(err)
+		} else {
+			pr.DataNodeList[k] = utils.NodeID{Timestamp: m.TimeStamp, IP: m.IP}
+		}
+	}
+
 	pr.NexthopIP = pr.DataNodeList[0].IP
 	pr.NexthopPort = mn.DNPort
 

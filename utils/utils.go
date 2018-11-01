@@ -62,6 +62,15 @@ func HashReplicaRange(filename string, capacity uint32) ([NumReplica]uint8, erro
 	var res [NumReplica]uint8
 	if capacity <= 0 {
 		return res, errors.New("Capacity is lower than 1")
+	} else if capacity < NumReplica {
+		for i := uint32(0); i < NumReplica; i++ {
+			if i < capacity {
+				res[i] = uint8(i)
+			} else {
+				res[i] = 255
+			}
+		}
+		return res, errors.New("Capacity is lower than num replica")
 	}
 	h := fnv.New32a()
 	h.Write([]byte(filename))
@@ -100,7 +109,7 @@ func GetLocalHostname() string {
 	cmd.Stdout = &out
 	err := cmd.Run()
 	if err != nil {
-	    fmt.Println(err.Error())
+		fmt.Println(err.Error())
 	}
 	hostname := out.String()
 	hostname = hostname[:len(hostname)-1] // removing EOL
