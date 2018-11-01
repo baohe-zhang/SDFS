@@ -126,7 +126,7 @@ func udpDaemon() {
 	go udpDaemonHandle(listen)
 	go periodicPing()
 	go periodicPingIntroducer()
-	go handleCommand(userCmd)
+	handleCommand(userCmd)
 }
 
 // Concurrently read user input by chanel

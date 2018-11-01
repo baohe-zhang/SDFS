@@ -22,13 +22,8 @@ func main() {
 	masterIP = utils.LookupIP(masterIP)
 	localIP := utils.GetLocalIP().String()
 
-	// Init
 	if membership.Initilize() == true {
 		fmt.Printf("[INFO]: Start service\n")
-	}
-	membership.Start(masterIP, fmt.Sprintf("%d", membershipPort))
-
-	for membership.CurrentList.Size() <= 2 {
 	}
 
 	if masterIP == localIP {
@@ -37,7 +32,10 @@ func main() {
 	}
 	nodeID := utils.NodeID{Timestamp: membership.CurrentMember.TimeStamp, IP: membership.CurrentMember.IP}
 	node := datanode.NewDataNode(fmt.Sprintf("%d", datanodePort), membership.CurrentList, nodeID)
-	node.Start()
+	go node.Start()
 
-	select {}
+	membership.Start(masterIP, fmt.Sprintf("%d", membershipPort))
+
+	/*for membership.CurrentList.Size() <= 2 {*/
+	/*}*/
 }
