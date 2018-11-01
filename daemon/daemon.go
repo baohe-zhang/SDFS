@@ -22,7 +22,11 @@ func main() {
 	masterIP = utils.LookupIP(masterIP)
 	localIP := utils.GetLocalIP().String()
 
-	membership.Start(masterIP, fmt.Sprintf("%d", membershipPort))
+	// Init
+	if membership.Initilize() == true {
+		fmt.Printf("[INFO]: Start service\n")
+	}
+	go membership.Start(masterIP, fmt.Sprintf("%d", membershipPort))
 
 	for membership.CurrentList.Size() <= 2 {
 	}

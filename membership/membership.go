@@ -196,7 +196,7 @@ func initiateLeave() {
 	isUpdateDuplicate(uid)
 	Logger.Info("Member (%d, %s) leaves", CurrentMember.TimeStamp, LocalIP)
 	time.Sleep(LeaveDelayPeriod)
-	initilize()
+	Initilize()
 }
 
 func periodicPingIntroducer() {
@@ -675,7 +675,7 @@ func ping(member *Member) {
 }
 
 // Start the membership service and join in the group
-func initilize() bool {
+func Initilize() bool {
 	// Create self entry
 	LocalIP = getLocalIP().String()
 	Logger = NewSsmsLogger(LocalIP)
@@ -700,10 +700,6 @@ func Start(introducerIP, port string) {
 	IntroducerIP = introducerIP
 	Port = ":" + port
 
-	// Init
-	if initilize() == true {
-		fmt.Printf("[INFO]: Start service\n")
-	}
 	// Start daemon
-	go udpDaemon()
+	udpDaemon()
 }
