@@ -39,6 +39,7 @@ func (dn *dataNode) Listener(port string) {
 
 	for {
 		conn, err := ln.Accept()
+		defer conn.Close()
 		if err != nil {
 			fmt.Println(err.Error())
 		}
@@ -71,13 +72,11 @@ func (dn *dataNode) Handler(conn net.Conn) {
 
 // Receive remote file from cleint, store it in local and send it to next hop if possible
 func (dn *dataNode) fileReader(conn net.Conn, wr utils.WriteRequest) {
-	defer conn.Close()
-
 	filesize := wr.Filesize
 	// Create local filename from write request
-	_filename := utils.Hash2Text(wr.FilenameHash[:])
+	hashFilename := utils.Hash2Text(wr.FilenameHash[:])
 	timestamp := fmt.Sprintf("%d", wr.Timestamp)
-	filename := _filename + ":" + timestamp
+	filename := hashFilename + ":" + timestamp
 
 	fmt.Println("filename: ", filename)
 
@@ -96,7 +95,7 @@ func (dn *dataNode) fileReader(conn net.Conn, wr utils.WriteRequest) {
 		hasNextNode = false
 	} else {
 		fmt.Println("next node addr: ", (*nextNodeConn).RemoteAddr().String())
-		// defer (*nextNodeConn).Close()
+		defer (*nextNodeConn).Close()
 	}
 
 	// Ready to receive file
@@ -130,9 +129,9 @@ func (dn *dataNode) fileReader(conn net.Conn, wr utils.WriteRequest) {
 			Filesize:  wr.Filesize,
 			DataNodes: wr.DataNodeList[:],
 		}
-		meta.PutFileInfo(_filename, info)
+		meta.PutFileInfo(hashFilename, info)
 		meta.StoreMeta("meta.json")
-		fmt.Printf("put %s with ts %d into meta list\n", _filename, wr.Timestamp)
+		fmt.Printf("put %s with ts %d into meta list\n", hashFilename, wr.Timestamp)
 
 		// Tell master it receives a file
 		// dialMasterNode()
