@@ -49,8 +49,6 @@ func listener() {
 }
 
 func handler(conn net.Conn) {
-	defer conn.Close()
-
 	buf := make([]byte, BufferSize)
 	n, err := conn.Read(buf)
 	if err != nil {
@@ -71,6 +69,7 @@ func handler(conn net.Conn) {
 
 		fileWriter(conn, msg)
 	}
+	conn.Close()
 }
 
 // Receive remote file from cleint, store it in local and send it to next hop if possible
@@ -179,6 +178,7 @@ func fileWriter(conn net.Conn, rr utils.ReadRequest) {
 			break
 		}
 	}
+
 }
 
 func dialMasterNode(masterID uint8, filenameHash [32]byte, filesize uint64, timestamp uint64) {
