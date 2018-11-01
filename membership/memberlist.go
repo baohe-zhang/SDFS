@@ -31,6 +31,10 @@ func (ml *MemberList) Size() int {
 	return ml.size
 }
 
+func (ml *MemberList) Len() int {
+	return ml.size
+}
+
 // Return the member if exists, otherwise return error
 func (ml *MemberList) Retrieve(ts uint64, ip uint32) (*Member, error) {
 	idx := ml.Select(ts, ip)
