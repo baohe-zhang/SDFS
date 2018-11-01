@@ -363,13 +363,13 @@ func udpDaemonHandle(connect *net.UDPConn) {
 			// Check header's reserved field
 			// If reserved field is 0xff, means this handler is missing in someone else's memberlist,
 			// Hence disseminate join update
-			if header.Reserved == 0xff {
-				uid := TTLCaches.RandGen.Uint64()
-				update := Update{uid, TTL_, MemUpdateJoin, CurrentMember.TimeStamp, CurrentMember.IP, CurrentMember.State}
-				TTLCaches.Set(&update)
-				isUpdateDuplicate(uid)
-				Logger.Info("Receive header with reserved 0xff, disseminate join update")
-			}
+			/*if header.Reserved == 0xff {*/
+			//uid := TTLCaches.RandGen.Uint64()
+			//update := Update{uid, TTL_, MemUpdateJoin, CurrentMember.TimeStamp, CurrentMember.IP, CurrentMember.State}
+			//TTLCaches.Set(&update)
+			//isUpdateDuplicate(uid)
+			//Logger.Info("Receive header with reserved 0xff, disseminate join update")
+			/*}*/
 
 			// Read payload
 			payload := buffer[HeaderLength:n]
