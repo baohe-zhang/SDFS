@@ -133,7 +133,7 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 		}
 		meta.PutFileInfo(_filename, info)
 		meta.StoreMeta("meta.json")
-		fmt.Printf("put %s with ts %d into meta list", _filename, wr.Timestamp)
+		fmt.Printf("put %s with ts %d into meta list\n", _filename, wr.Timestamp)
 
 		// Tell master it receives a file
 		// dialMasterNode()
@@ -155,11 +155,18 @@ func fileWriter(conn net.Conn, rr utils.ReadRequest) {
 	}
 	defer file.Close()
 
+	// Block until it receives OK
 	buf := make([]byte, BufferSize)
-	n, err := conn.Read(buf)
-
-	for string(buf[:n]) != "OK" {
+	n, _ := conn.Read(buf)
+	for n > 0 {
+		if string(buf[:n]) == "OK" {
+			break
+		} else {
+			buf = make([]byte, BufferSize)
+			n, _ = conn.Read(buf)
+		}
 	}
+
 	fmt.Println("client ready to receive file")
 
 	buf = make([]byte, BufferSize)
