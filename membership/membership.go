@@ -125,7 +125,7 @@ func udpDaemon() {
 	global_wg.Add(1)
 	go udpDaemonHandle(listen)
 	go periodicPing()
-	go periodicPingIntroducer()
+	//go periodicPingIntroducer()
 	handleCommand(userCmd)
 }
 
@@ -532,13 +532,13 @@ func handleJoin(payload []byte) {
 			update.MemberState})
 		TTLCaches.Set(&update)
 		// Introducer diseeminate its info when receives join
-		if LocalIP == IntroducerIP {
-			uid := TTLCaches.RandGen.Uint64()
-			reply_update := Update{uid, TTL_, MemUpdateJoin, CurrentMember.TimeStamp, CurrentMember.IP, CurrentMember.State}
-			TTLCaches.Set(&reply_update)
-			isUpdateDuplicate(uid)
-			Logger.Info("Introducer set its info update to the cache\n")
-		}
+		/*if LocalIP == IntroducerIP {*/
+		//uid := TTLCaches.RandGen.Uint64()
+		//reply_update := Update{uid, TTL_, MemUpdateJoin, CurrentMember.TimeStamp, CurrentMember.IP, CurrentMember.State}
+		//TTLCaches.Set(&reply_update)
+		//isUpdateDuplicate(uid)
+		//Logger.Info("Introducer set its info update to the cache\n")
+		/*}*/
 	}
 }
 
