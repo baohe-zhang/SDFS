@@ -1,33 +1,23 @@
-package main
+package master
 
 import (
 	"fmt"
 	"net"
+	"simpledfs/membership"
 	"simpledfs/utils"
 	"time"
 )
 
-var MemberList = [...]string{
-	"fa18-cs425-g29-01.cs.illinois.edu",
-	"fa18-cs425-g29-02.cs.illinois.edu",
-	"fa18-cs425-g29-03.cs.illinois.edu",
-	"fa18-cs425-g29-04.cs.illinois.edu",
-	"fa18-cs425-g29-05.cs.illinois.edu",
-	"fa18-cs425-g29-06.cs.illinois.edu",
-	"fa18-cs425-g29-07.cs.illinois.edu",
-	"fa18-cs425-g29-08.cs.illinois.edu",
-	"fa18-cs425-g29-09.cs.illinois.edu",
-	"fa18-cs425-g29-10.cs.illinois.edu",
-}
-
 var meta utils.Meta
 
 type masterNode struct {
-	Port string
+	Port       string
+	DNPort     uint16
+	MemberList *membership.MemberList
 }
 
-func NewMasterNode(port string) *masterNode {
-	mn := masterNode{Port: port}
+func NewMasterNode(port string, dnPort uint16, memberList *membership.MemberList) *masterNode {
+	mn := masterNode{Port: port, DNPort: dnPort, MemberList: memberList}
 	return &mn
 }
 
@@ -43,11 +33,13 @@ func (mn *masterNode) HandlePutRequest(prMsg utils.PutRequest, conn net.Conn) {
 	fmt.Println(utils.Hash2Text(pr.FilenameHash[:]))
 	pr.Filesize = prMsg.Filesize
 	pr.Timestamp = uint64(timestamp)
-	dnList, err := utils.HashReplicaRange(filename, 10)
+	dnList, err := utils.HashReplicaRange(filename, uint32(mn.MemberList.Size()))
+	for k, v := range dnList {
+		pr.DataNodeList[k] = utils.NodeID{Timestamp: mn.MemberList.Members[v].TimeStamp, IP: mn.MemberList.Members[v].IP}
+	}
 	utils.PrintError(err)
-	pr.DataNodeList = dnList
-	pr.NexthopIP = utils.BinaryIP(utils.LookupIP(MemberList[dnList[0]]))
-	pr.NexthopPort = uint16(8000)
+	pr.NexthopIP = pr.DataNodeList[0].IP
+	pr.NexthopPort = mn.DNPort
 
 	bin := utils.Serialize(pr)
 	conn.Write(bin)
@@ -73,8 +65,8 @@ func (mn *masterNode) HandleGetRequest(grMsg utils.GetRequest, conn net.Conn) {
 	nodeIPs := [utils.NumReplica]uint32{}
 	nodePorts := [utils.NumReplica]uint16{}
 	for k, v := range info.DataNodes {
-		nodeIPs[k] = utils.BinaryIP(utils.LookupIP(MemberList[v]))
-		nodePorts[k] = 8000
+		nodeIPs[k] = v.IP
+		nodePorts[k] = mn.DNPort
 	}
 	gr.DataNodeIPList = nodeIPs
 	gr.DataNodePortList = nodePorts
@@ -109,7 +101,7 @@ func (mn *masterNode) Handle(conn net.Conn) {
 	}
 }
 
-func (mn *masterNode) start() {
+func (mn *masterNode) Start() {
 	//meta = utils.NewMeta("MasterMeta")
 	meta = utils.Meta{}
 
@@ -125,9 +117,4 @@ func (mn *masterNode) start() {
 		}
 		go mn.Handle(conn)
 	}
-}
-
-func main() {
-	node := NewMasterNode("5000")
-	node.start()
 }

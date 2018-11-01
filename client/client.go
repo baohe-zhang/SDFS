@@ -79,10 +79,12 @@ func fileGet(gr utils.GetResponse, localfile string) {
 	var conn net.Conn
 	hasConn := false
 	for index, ip := range gr.DataNodeIPList {
-		conn, err := net.Dial("tcp", utils.StringIP(ip)+":"+fmt.Sprintf("%d", gr.DataNodePortList[index]))
+		var err error
+		conn, err = net.Dial("tcp", utils.StringIP(ip)+":"+fmt.Sprintf("%d", gr.DataNodePortList[index]))
 		utils.PrintError(err)
 		if err == nil {
 			hasConn = true
+			fmt.Println("Dial ", utils.StringIP(ip), " successful")
 			break
 		}
 		defer conn.Close()
@@ -92,7 +94,7 @@ func fileGet(gr utils.GetResponse, localfile string) {
 		return
 	}
 
-	file, err := os.Open(localfile)
+	file, err := os.Create(localfile)
 	utils.PrintError(err)
 
 	rr := utils.ReadRequest{MsgType: utils.ReadRequestMsg}
@@ -100,9 +102,11 @@ func fileGet(gr utils.GetResponse, localfile string) {
 
 	bin := utils.Serialize(rr)
 	_, err = conn.Write(bin)
+	fmt.Println("Sent ReadRequest")
 	utils.PrintError(err)
 
 	conn.Write([]byte("OK"))
+	fmt.Println("Sent OK")
 
 	buf := make([]byte, BufferSize)
 	var receivedBytes uint64

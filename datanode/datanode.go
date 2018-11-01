@@ -3,6 +3,7 @@ package datanode
 import (
 	"fmt"
 	"net"
+	"simpledfs/membership"
 	"simpledfs/utils"
 	// "time"
 	// "sync"
@@ -12,29 +13,25 @@ import (
 	"os"
 )
 
-var NodeID uint8
-var NodePort string
 var meta utils.Meta
-
-var MemberList = [...]string{
-	"fa18-cs425-g29-01.cs.illinois.edu",
-	"fa18-cs425-g29-02.cs.illinois.edu",
-	"fa18-cs425-g29-03.cs.illinois.edu",
-	"fa18-cs425-g29-04.cs.illinois.edu",
-	"fa18-cs425-g29-05.cs.illinois.edu",
-	"fa18-cs425-g29-06.cs.illinois.edu",
-	"fa18-cs425-g29-07.cs.illinois.edu",
-	"fa18-cs425-g29-08.cs.illinois.edu",
-	"fa18-cs425-g29-09.cs.illinois.edu",
-	"fa18-cs425-g29-10.cs.illinois.edu",
-}
 
 const (
 	BufferSize = 4096
 )
 
-func listener(port string) {
-	ln, err := net.Listen("tcp", ":" + port)
+type dataNode struct {
+	NodeID     utils.NodeID
+	NodePort   string
+	MemberList *membership.MemberList
+}
+
+func NewDataNode(port string, memberList *membership.MemberList, nodeID utils.NodeID) *dataNode {
+	dn := dataNode{NodePort: port, MemberList: memberList, NodeID: nodeID}
+	return &dn
+}
+
+func (dn *dataNode) Listener(port string) {
+	ln, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
@@ -45,11 +42,11 @@ func listener(port string) {
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-		go handler(conn)
+		go dn.Handler(conn)
 	}
 }
 
-func handler(conn net.Conn) {
+func (dn *dataNode) Handler(conn net.Conn) {
 	buf := make([]byte, BufferSize)
 	n, err := conn.Read(buf)
 	if err != nil {
@@ -61,19 +58,19 @@ func handler(conn net.Conn) {
 		msg := utils.WriteRequest{}
 		utils.Deserialize(buf[:n], &msg)
 
-		fileReader(conn, msg)
+		dn.fileReader(conn, msg)
 
 	} else if buf[0]&utils.ReadRequestMsg != 0 {
 		// Receive read request from client
 		msg := utils.ReadRequest{}
 		utils.Deserialize(buf[:n], &msg)
 
-		fileWriter(conn, msg)
+		dn.fileWriter(conn, msg)
 	}
 }
 
 // Receive remote file from cleint, store it in local and send it to next hop if possible
-func fileReader(conn net.Conn, wr utils.WriteRequest) {
+func (dn *dataNode) fileReader(conn net.Conn, wr utils.WriteRequest) {
 	defer conn.Close()
 
 	filesize := wr.Filesize
@@ -93,7 +90,7 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 
 	// Check whether next node exists
 	hasNextNode := true
-	nextNodeConn, err := dialDataNode(wr)
+	nextNodeConn, err := dn.dialDataNode(wr)
 	if err != nil {
 		fmt.Println(err.Error())
 		hasNextNode = false
@@ -143,7 +140,7 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 }
 
 // Send local file to client
-func fileWriter(conn net.Conn, rr utils.ReadRequest) {
+func (dn *dataNode) fileWriter(conn net.Conn, rr utils.ReadRequest) {
 	defer conn.Close()
 
 	// Retrieve local filename from read request and meta data
@@ -186,7 +183,7 @@ func fileWriter(conn net.Conn, rr utils.ReadRequest) {
 
 }
 
-func dialMasterNode(masterID uint8, filenameHash [32]byte, filesize uint64, timestamp uint64) {
+func (dn *dataNode) dialMasterNode(masterID uint8, filenameHash [32]byte, filesize uint64, timestamp uint64) {
 	conn, err := net.Dial("tcp", ":8000")
 	if err != nil {
 		fmt.Println(err.Error())
@@ -198,19 +195,19 @@ func dialMasterNode(masterID uint8, filenameHash [32]byte, filesize uint64, time
 		FilenameHash: filenameHash,
 		Filesize:     filesize,
 		Timestamp:    timestamp,
-		DataNode:     NodeID,
+		DataNode:     dn.NodeID,
 	}
 
 	conn.Write(utils.Serialize(wc))
 }
 
-func dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
-	nodeID, err := getNexthopID(wr.DataNodeList[:])
+func (dn *dataNode) dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
+	nodeID, err := dn.getNexthopID(wr.DataNodeList[:])
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := net.Dial("tcp", getNodeIP(nodeID)+":"+getNodePort(nodeID))
+	conn, err := net.Dial("tcp", utils.StringIP(dn.NodeID.IP)+":"+dn.NodePort)
 	if err != nil {
 		return nil, err
 	}
@@ -229,49 +226,28 @@ func dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 }
 
 // Return the first non-zero nodeID's index
-func getNexthopID(nodeList []uint8) (uint8, error) {
+func (dn *dataNode) getNexthopID(nodeList []utils.NodeID) (utils.NodeID, error) {
 	for k, v := range nodeList {
-		if v == NodeID && k < len(nodeList)-1 {
+		if v == dn.NodeID && k < len(nodeList)-1 {
 			return nodeList[k+1], nil
 		}
 	}
-	return 255, errors.New("Nexthop doesn't exists")
+	return utils.NodeID{}, errors.New("Nexthop doesn't exists")
 }
 
-func getNodeIP(nodeID uint8) string {
-	return MemberList[nodeID]
-}
-
-func getNodePort(nodeID uint8) string {
-	return "8000"
-}
-
-func getNodeID(hostname string) (uint8, error) {
-	for k, v := range MemberList {
-		if hostname == v {
+func (dn *dataNode) getNodeID() (uint8, error) {
+	for k, v := range dn.MemberList.Members {
+		if dn.NodeID.IP == v.IP {
 			return uint8(k), nil
 		}
 	}
 	return 255, errors.New("hostname doesn't match any nodeID")
 }
 
-func Start(port string) {
-	var err error
-	NodeID, err = getNodeID(utils.GetLocalHostname())
-	if err != nil {
-		fmt.Println(err.Error())
-	} else {
-		fmt.Println("Node ID: ", NodeID)
-	}
-	NodePort = port
-
+func (dn *dataNode) Start() {
 	meta = utils.NewMeta("meta.json")
 
-	go listener(NodePort)
+	go dn.Listener(dn.NodePort)
 
 	select {}
-}
-
-func main() {
-	start()
 }

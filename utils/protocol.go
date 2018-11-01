@@ -27,7 +27,7 @@ type PutResponse struct {
 	Timestamp    uint64
 	NexthopIP    uint32
 	NexthopPort  uint16
-	DataNodeList [NumReplica]uint8
+	DataNodeList [NumReplica]NodeID
 }
 
 type PutConfirm struct {
@@ -38,7 +38,7 @@ type WriteRequest struct {
 	FilenameHash [32]byte
 	Filesize     uint64
 	Timestamp    uint64
-	DataNodeList [NumReplica]uint8
+	DataNodeList [NumReplica]NodeID
 }
 
 type WriteConfirm struct {
@@ -46,7 +46,7 @@ type WriteConfirm struct {
 	FilenameHash [32]byte
 	Filesize     uint64
 	Timestamp    uint64
-	DataNode     uint8
+	DataNode     NodeID
 }
 
 type GetRequest struct {
@@ -65,4 +65,9 @@ type GetResponse struct {
 type ReadRequest struct {
 	MsgType      uint8
 	FilenameHash [32]byte
+}
+
+type NodeID struct {
+	Timestamp uint64
+	IP        uint32
 }

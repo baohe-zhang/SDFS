@@ -14,7 +14,7 @@ type Infos []Info
 type Info struct {
 	Timestamp uint64
 	Filesize  uint64
-	DataNodes []uint8
+	DataNodes []NodeID
 }
 
 func NewMeta(filename string) Meta {
