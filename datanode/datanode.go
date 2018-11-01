@@ -250,7 +250,5 @@ func (dn *dataNode) getNodeID() (uint8, error) {
 func (dn *dataNode) Start() {
 	meta = utils.NewMeta("meta.json")
 
-	go dn.Listener(dn.NodePort)
-
-	select {}
+	dn.Listener(dn.NodePort)
 }
