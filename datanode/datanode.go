@@ -41,12 +41,15 @@ func (dn *dataNode) Listener(port string) {
 		conn, err := ln.Accept()
 		if err != nil {
 			fmt.Println(err.Error())
+			continue
 		}
 		go dn.Handler(conn)
 	}
 }
 
 func (dn *dataNode) Handler(conn net.Conn) {
+	defer conn.Close()
+
 	buf := make([]byte, BufferSize)
 	n, err := conn.Read(buf)
 	if err != nil {
@@ -100,6 +103,7 @@ func (dn *dataNode) fileReader(conn net.Conn, wr utils.WriteRequest) {
 
 	// Ready to receive file
 	conn.Write([]byte("OK"))
+	fmt.Prinln("Sent OK")
 
 	// Read file data from connection and write to local
 	buf := make([]byte, BufferSize)
