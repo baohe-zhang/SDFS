@@ -39,7 +39,6 @@ func (dn *dataNode) Listener(port string) {
 
 	for {
 		conn, err := ln.Accept()
-		defer conn.Close()
 		if err != nil {
 			fmt.Println(err.Error())
 		}
@@ -68,6 +67,7 @@ func (dn *dataNode) Handler(conn net.Conn) {
 
 		dn.fileWriter(conn, msg)
 	}
+	conn.Close()
 }
 
 // Receive remote file from cleint, store it in local and send it to next hop if possible
