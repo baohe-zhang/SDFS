@@ -56,7 +56,6 @@ func (dn *dataNode) Handler(conn net.Conn) {
 
 		dn.fileWriter(conn, msg)
 	}
-	conn.Close()
 }
 
 // Receive remote file from cleint, store it in local and send it to next hop if possible
