@@ -149,7 +149,7 @@ func fileWriter(conn net.Conn, rr utils.ReadRequest) {
 	filename = filename + ":" + timestamp
 
 	// Send file to client
-	file, err := os.Open(filename)
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0755)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
@@ -248,10 +248,9 @@ func main() {
 	NodeID, err = getNodeID(utils.GetLocalHostname())
 	if err != nil {
 		fmt.Println(err.Error())
-		return
+	} else {
+		fmt.Println("Node ID: ", NodeID)
 	}
-
-	fmt.Println("Node ID: ", NodeID)
 
 	meta = utils.NewMeta("meta.json")
 
