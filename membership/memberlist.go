@@ -35,6 +35,20 @@ func (ml *MemberList) Len() int {
 	return ml.size
 }
 
+func (ml *MemberList) Less(i, j int) bool {
+	if ml.Members[i].IP < ml.Members[j].IP {
+		return true
+	}
+	if ml.Members[i].IP > ml.Members[j].IP {
+		return false
+	}
+	return ml.Members[i].TimeStamp < ml.Members[j].TimeStamp
+}
+
+func (ml *MemberList) Swap(i, j int) {
+	ml.Members[i], ml.Members[j] = ml.Members[j], ml.Members[i]
+}
+
 // Return the member if exists, otherwise return error
 func (ml *MemberList) Retrieve(ts uint64, ip uint32) (*Member, error) {
 	idx := ml.Select(ts, ip)
@@ -68,17 +82,7 @@ func (ml *MemberList) Insert(m *Member) error {
 	// Insert new member
 	ml.Members[ml.size] = m
 	ml.size += 1
-	if ml.Size() > 1 {
-		sort.Slice(ml.Members, func(i, j int) bool {
-			if ml.Members[i].IP < ml.Members[j].IP {
-				return true
-			}
-			if ml.Members[i].IP > ml.Members[j].IP {
-				return false
-			}
-			return ml.Members[i].TimeStamp < ml.Members[j].TimeStamp
-		})
-	}
+	sort.Sort(ml)
 
 	// Log Insert
 	Logger.Info("Insert member (%d, %d)\n", m.TimeStamp, m.IP)
