@@ -1,4 +1,4 @@
-package main
+package datanode
 
 import (
 	"fmt"
@@ -13,6 +13,7 @@ import (
 )
 
 var NodeID uint8
+var NodePort string
 var meta utils.Meta
 
 var MemberList = [...]string{
@@ -32,8 +33,8 @@ const (
 	BufferSize = 4096
 )
 
-func listener() {
-	ln, err := net.Listen("tcp", ":8000")
+func listener(port string) {
+	ln, err := net.Listen("tcp", ":" + port)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
@@ -69,11 +70,12 @@ func handler(conn net.Conn) {
 
 		fileWriter(conn, msg)
 	}
-	conn.Close()
 }
 
 // Receive remote file from cleint, store it in local and send it to next hop if possible
 func fileReader(conn net.Conn, wr utils.WriteRequest) {
+	defer conn.Close()
+
 	filesize := wr.Filesize
 	// Create local filename from write request
 	_filename := utils.Hash2Text(wr.FilenameHash[:])
@@ -97,6 +99,7 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 		hasNextNode = false
 	} else {
 		fmt.Println("next node addr: ", (*nextNodeConn).RemoteAddr().String())
+		// defer (*nextNodeConn).Close()
 	}
 
 	// Ready to receive file
@@ -141,6 +144,8 @@ func fileReader(conn net.Conn, wr utils.WriteRequest) {
 
 // Send local file to client
 func fileWriter(conn net.Conn, rr utils.ReadRequest) {
+	defer conn.Close()
+
 	// Retrieve local filename from read request and meta data
 	filename := utils.Hash2Text(rr.FilenameHash[:])
 	info := meta.FileInfo(filename)
@@ -250,7 +255,7 @@ func getNodeID(hostname string) (uint8, error) {
 	return 255, errors.New("hostname doesn't match any nodeID")
 }
 
-func main() {
+func Start(port string) {
 	var err error
 	NodeID, err = getNodeID(utils.GetLocalHostname())
 	if err != nil {
@@ -258,10 +263,15 @@ func main() {
 	} else {
 		fmt.Println("Node ID: ", NodeID)
 	}
+	NodePort = port
 
 	meta = utils.NewMeta("meta.json")
 
-	go listener()
+	go listener(NodePort)
 
 	select {}
+}
+
+func main() {
+	start()
 }
