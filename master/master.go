@@ -36,7 +36,7 @@ func (mn *masterNode) HandlePutRequest(prMsg utils.PutRequest, conn net.Conn) {
 	dnList, err := utils.HashReplicaRange(filename, uint32(mn.MemberList.Size()))
 	utils.PrintError(err)
 	for k, v := range dnList {
-		m, err := mn.MemberList.RetrieveByIdx(v)
+		m, err := mn.MemberList.RetrieveByIdx(int(v))
 		if err != nil {
 			utils.PrintError(err)
 		} else {
