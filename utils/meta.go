@@ -34,14 +34,14 @@ func NewMeta(filename string) Meta {
 }
 
 func (meta Meta) StoreMeta(filename string) {
-	file, err := os.Open(filename)
+	file, err := os.Create(filename)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 	defer file.Close()
 
 	b, _ := json.Marshal(meta)
-	file.Write(b[:])
+	file.Write(b)
 }
 
 func (meta Meta) FileInfo(filename string) Info {
@@ -74,17 +74,21 @@ func (meta Meta) SortFileInfo(filename string) {
 }
 
 // Test client
-/*
-func main() {
-	meta := NewMeta("meta3.json")
 
-	info := Info{
-		Timestamp: 20,
-		Filesize:  32,
-		DataNodes: []uint8{1, 2, 3, 4},
-	}
+// func main() {
+// 	meta := NewMeta("meta.json")
 
-	meta.PutFileInfo("file1", info)
-	fmt.Println(meta["file1"])
-}
-*/
+// 	info := Info{
+// 		Timestamp: 20,
+// 		Filesize:  32,
+// 		DataNodes: []uint8{4, 5, 8, 9},
+// 	}
+
+// 	meta.PutFileInfo("file3", info)
+// 	fmt.Println(meta["file1"])
+
+// 	meta.StoreMeta("meta2.json")
+
+// 	meta2 := NewMeta("meta2.json")
+// 	fmt.Println(meta2["file1"])
+// }
