@@ -31,20 +31,6 @@ func NewDataNode(port string, memberList *membership.MemberList, nodeID utils.No
 }
 
 func (dn *dataNode) Listener(port string) {
-	ln, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	defer ln.Close()
-
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			fmt.Println(err.Error())
-			continue
-		}
-		go dn.Handler(conn)
-	}
 }
 
 func (dn *dataNode) Handler(conn net.Conn) {
@@ -250,5 +236,16 @@ func (dn *dataNode) getNodeID() (uint8, error) {
 func (dn *dataNode) Start() {
 	meta = utils.NewMeta("meta.json")
 
-	dn.Listener(dn.NodePort)
+	ln, err := net.Listen("tcp", ":"+dn.NodePort)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		go dn.Handler(conn)
+	}
 }
