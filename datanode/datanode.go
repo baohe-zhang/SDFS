@@ -217,7 +217,8 @@ func (dn *dataNode) dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 // Return the first non-zero nodeID's index
 func (dn *dataNode) getNexthopID(nodeList []utils.NodeID) (utils.NodeID, error) {
 	for k, v := range nodeList {
-		if v == dn.NodeID && k < len(nodeList)-1 && nodeList[k+1].IP != 0 && nodeList[k+1].Timestamp != 0{
+		if v == dn.NodeID && k < len(nodeList)-1 &&
+			nodeList[k+1].IP != 0 && nodeList[k+1].Timestamp != 0 {
 			return nodeList[k+1], nil
 		}
 	}
