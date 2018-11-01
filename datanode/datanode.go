@@ -103,7 +103,7 @@ func (dn *dataNode) fileReader(conn net.Conn, wr utils.WriteRequest) {
 
 	// Ready to receive file
 	conn.Write([]byte("OK"))
-	fmt.Prinln("Sent OK")
+	fmt.Println("Sent OK")
 
 	// Read file data from connection and write to local
 	buf := make([]byte, BufferSize)
