@@ -26,7 +26,7 @@ func main() {
 	if membership.Initilize() == true {
 		fmt.Printf("[INFO]: Start service\n")
 	}
-	go membership.Start(masterIP, fmt.Sprintf("%d", membershipPort))
+	membership.Start(masterIP, fmt.Sprintf("%d", membershipPort))
 
 	for membership.CurrentList.Size() <= 2 {
 	}

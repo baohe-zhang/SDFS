@@ -118,10 +118,6 @@ func udpDaemon() {
 	listen, err := net.ListenUDP("udp", udpAddr)
 	printError(err)
 
-	// Use waitgroup
-	var wg sync.WaitGroup
-	wg.Add(1)
-
 	userCmd := make(chan string)
 
 	go readCommand(userCmd)
@@ -130,7 +126,23 @@ func udpDaemon() {
 	go udpDaemonHandle(listen)
 	go periodicPing()
 	go periodicPingIntroducer()
+	go handleCommand(userCmd)
+}
 
+// Concurrently read user input by chanel
+func readCommand(input chan<- string) {
+	for {
+		var cmd string
+		_, err := fmt.Scanln(&cmd)
+		if err != nil {
+			fmt.Println(err)
+		}
+		input <- cmd
+	}
+}
+
+// Handle user input command
+func handleCommand(userCmd chan string) {
 	for {
 		s := <-userCmd
 		switch s {
@@ -172,19 +184,6 @@ func udpDaemon() {
 		}
 	}
 
-	wg.Wait()
-}
-
-// Concurrently read user input by chanel
-func readCommand(input chan<- string) {
-	for {
-		var cmd string
-		_, err := fmt.Scanln(&cmd)
-		if err != nil {
-			fmt.Println(err)
-		}
-		input <- cmd
-	}
 }
 
 func initiateLeave() {
