@@ -105,9 +105,6 @@ func fileGet(gr utils.GetResponse, localfile string) {
 	fmt.Println("Sent ReadRequest")
 	utils.PrintError(err)
 
-	conn.Write([]byte("OK"))
-	fmt.Println("Sent OK")
-
 	buf := make([]byte, BufferSize)
 	var receivedBytes uint64
 

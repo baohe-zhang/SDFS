@@ -158,16 +158,16 @@ func (dn *dataNode) fileWriter(conn net.Conn, rr utils.ReadRequest) {
 	defer file.Close()
 
 	// Block until it receives OK
-	buf := make([]byte, BufferSize)
-	n, _ := conn.Read(buf)
-	for n > 0 {
-		if string(buf[:n]) == "OK" {
-			break
-		} else {
-			buf = make([]byte, BufferSize)
-			n, _ = conn.Read(buf)
-		}
-	}
+	/*buf := make([]byte, BufferSize)*/
+	//n, _ := conn.Read(buf)
+	//for n > 0 {
+	//if string(buf[:n]) == "OK" {
+	//break
+	//} else {
+	//buf = make([]byte, BufferSize)
+	//n, _ = conn.Read(buf)
+	//}
+	/*}*/
 
 	fmt.Println("client ready to receive file")
 
