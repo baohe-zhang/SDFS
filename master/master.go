@@ -132,6 +132,7 @@ func (mn *masterNode) Handle(conn net.Conn) {
 func (mn *masterNode) Start() {
 	//meta = utils.NewMeta("MasterMeta")
 	meta = utils.Meta{}
+	metaFile = make(map[string]string)
 
 	listener, err := net.Listen("tcp", ":"+mn.Port)
 	if err != nil {

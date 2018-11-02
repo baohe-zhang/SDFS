@@ -169,7 +169,7 @@ func getCommand(masterConn net.Conn, sdfsfile string, localfile string) {
 	}
 
 	if response.Filesize == 0 {
-		fmt.Printf("SDFS File %s does not exist", sdfsfile)
+		fmt.Printf("SDFS File %s does not exist\n", sdfsfile)
 		return
 	}
 
@@ -199,7 +199,7 @@ func deleteCommand(masterConn net.Conn, sdfsfile string) {
 	if response.IsSuccess {
 		fmt.Printf("SDFS File %s successfully deleted\n", sdfsfile)
 	} else {
-		fmt.Println("SDFS File %s does not exist", sdfsfile)
+		fmt.Println("SDFS File %s does not exist\n", sdfsfile)
 	}
 
 }
