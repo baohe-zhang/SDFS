@@ -171,7 +171,7 @@ func (dn *dataNode) fileWriter(conn net.Conn, rr utils.ReadRequest) {
 
 	fmt.Println("client ready to receive file")
 
-	buf = make([]byte, BufferSize)
+	buf := make([]byte, BufferSize)
 
 	for {
 		n, err := file.Read(buf)
