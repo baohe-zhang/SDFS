@@ -146,6 +146,10 @@ func (mn *masterNode) Handle(conn net.Conn) {
 		dr := utils.DeleteRequest{}
 		utils.Deserialize(buf[:n], &dr)
 		mn.HandleDeleteRequest(dr, conn)
+	case utils.ListRequestMsg:
+		lr := utils.ListRequest{}
+		utils.Deserialize(buf[:n], &lr)
+		mn.HandleListRequest(lr, conn)
 	default:
 		fmt.Println("Unrecognized packet")
 	}

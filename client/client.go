@@ -295,7 +295,7 @@ func main() {
 		}
 		fmt.Println(args[1:])
 		sdfsfile := args[1]
-		deleteCommand(masterConn, sdfsfile)
+		lsCommand(masterConn, sdfsfile)
 	case "store":
 		if len(args) != 1 {
 			fmt.Println("Invalid store usage")
