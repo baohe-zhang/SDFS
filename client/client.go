@@ -168,7 +168,40 @@ func getCommand(masterConn net.Conn, sdfsfile string, localfile string) {
 		return
 	}
 
+	if response.Filesize == 0 {
+		fmt.Printf("SDFS File %s does not exist", sdfsfile)
+		return
+	}
+
 	fileGet(response, localfile)
+}
+
+// Delete command execution for simpleDFS client
+func deleteCommand(masterConn net.Conn, sdfsfile string) {
+	drPacket := utils.DeleteRequest{MsgType: utils.DeleteRequestMsg}
+	copy(drPacket.Filename[:], sdfsfile)
+
+	bin := utils.Serialize(drPacket)
+	_, err := masterConn.Write(bin)
+	printErrorExit(err)
+
+	buf := make([]byte, BufferSize)
+	n, err := masterConn.Read(buf)
+	printErrorExit(err)
+
+	response := utils.DeleteResponse{}
+	utils.Deserialize(buf[:n], &response)
+	if response.MsgType != utils.DeleteResponseMsg {
+		fmt.Println("Unexpected message from MasterNode")
+		return
+	}
+
+	if response.IsSuccess {
+		fmt.Printf("SDFS File %s successfully deleted\n", sdfsfile)
+	} else {
+		fmt.Println("SDFS File %s does not exist", sdfsfile)
+	}
+
 }
 
 func main() {
@@ -219,6 +252,8 @@ func main() {
 			usage()
 		}
 		fmt.Println(args[1:])
+		sdfsfile := args[1]
+		deleteCommand(masterConn, sdfsfile)
 	case "ls":
 		if len(args) != 2 {
 			fmt.Println("Invalid ls usage")
@@ -240,7 +275,6 @@ func main() {
 	default:
 		usage()
 	}
-
 }
 
 // Helper function to print the err in process

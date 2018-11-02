@@ -44,13 +44,27 @@ func (meta Meta) StoreMeta(filename string) {
 	file.Write(b)
 }
 
-func (meta Meta) FileInfo(filename string) Info {
-	return meta[filename][0]
+func (meta Meta) FileInfo(filename string) (Info, bool) {
+	val, ok := meta[filename]
+	if ok {
+		return val[0], true
+	} else {
+		return Info{}, false
+	}
 }
 
 func (meta Meta) PutFileInfo(filename string, info Info) {
 	meta[filename] = append(meta[filename], info)
 	meta.SortFileInfo(filename)
+}
+
+func (meta Meta) RmFileInfo(filename string) bool {
+	_, ok := meta[filename]
+	if ok {
+		delete(meta, filename)
+		return true
+	}
+	return false
 }
 
 func (meta Meta) SortFileInfo(filename string) {

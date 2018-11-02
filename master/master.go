@@ -10,6 +10,8 @@ import (
 
 var meta utils.Meta
 
+var metaFile map[string]string
+
 type masterNode struct {
 	Port       string
 	DNPort     uint16
@@ -31,6 +33,7 @@ func (mn *masterNode) HandlePutRequest(prMsg utils.PutRequest, conn net.Conn) {
 	pr := utils.PutResponse{MsgType: utils.PutResponseMsg}
 	pr.FilenameHash = utils.HashFilename(filename)
 	fmt.Println(utils.Hash2Text(pr.FilenameHash[:]))
+	metaFile[utils.Hash2Text(pr.FilenameHash[:])] = filename
 	pr.Filesize = prMsg.Filesize
 	pr.Timestamp = uint64(timestamp)
 	dnList, err := utils.HashReplicaRange(filename, uint32(mn.MemberList.Size()))
@@ -66,8 +69,11 @@ func (mn *masterNode) HandleGetRequest(grMsg utils.GetRequest, conn net.Conn) {
 	gr := utils.GetResponse{MsgType: utils.GetResponseMsg}
 	gr.FilenameHash = utils.HashFilename(filename)
 	fmt.Println(utils.Hash2Text(gr.FilenameHash[:]))
-	info := meta.FileInfo(utils.Hash2Text(gr.FilenameHash[:]))
+	info, ok := meta.FileInfo(utils.Hash2Text(gr.FilenameHash[:]))
 	gr.Filesize = info.Filesize
+	if ok == false {
+		gr.Filesize = 0
+	}
 	nodeIPs := [utils.NumReplica]uint32{}
 	nodePorts := [utils.NumReplica]uint16{}
 	for k, v := range info.DataNodes {
@@ -80,6 +86,18 @@ func (mn *masterNode) HandleGetRequest(grMsg utils.GetRequest, conn net.Conn) {
 	bin := utils.Serialize(gr)
 	conn.Write(bin)
 
+	return
+}
+
+func (mn *masterNode) HandleDeleteRequest(drMsg utils.DeleteRequest, conn net.Conn) {
+	filename := utils.ParseFilename(drMsg.Filename[:])
+	fmt.Println("filename ", filename)
+	filenameHash := utils.HashFilename(filename)
+	ok := meta.RmFileInfo(utils.Hash2Text(filenameHash[:]))
+	dr := utils.DeleteResponse{MsgType: utils.DeleteResponseMsg, IsSuccess: ok}
+
+	bin := utils.Serialize(dr)
+	conn.Write(bin)
 	return
 }
 
@@ -102,6 +120,10 @@ func (mn *masterNode) Handle(conn net.Conn) {
 		gr := utils.GetRequest{}
 		utils.Deserialize(buf[:n], &gr)
 		mn.HandleGetRequest(gr, conn)
+	case utils.DeleteRequestMsg:
+		dr := utils.DeleteRequest{}
+		utils.Deserialize(buf[:n], &dr)
+		mn.HandleDeleteRequest(dr, conn)
 	default:
 		fmt.Println("Unrecognized packet")
 	}

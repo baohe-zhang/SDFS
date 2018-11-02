@@ -3,15 +3,19 @@ package utils
 import ()
 
 const (
-	NumReplica      = 4
-	PutRequestMsg   = 1
-	PutResponseMsg  = 2
-	PutConfirmMsg   = 3
-	WriteRequestMsg = 4
-	WriteConfirmMsg = 5
-	GetRequestMsg   = 6
-	GetResponseMsg  = 7
-	ReadRequestMsg  = 8
+	NumReplica        = 4
+	PutRequestMsg     = 1
+	PutResponseMsg    = 2
+	PutConfirmMsg     = 3
+	WriteRequestMsg   = 4
+	WriteConfirmMsg   = 5
+	GetRequestMsg     = 6
+	GetResponseMsg    = 7
+	ReadRequestMsg    = 8
+	DeleteRequestMsg  = 9
+	DeleteResponseMsg = 10
+	LsRequestMsg      = 11
+	LsResponseMsg     = 12
 )
 
 type PutRequest struct {
@@ -65,6 +69,26 @@ type GetResponse struct {
 type ReadRequest struct {
 	MsgType      uint8
 	FilenameHash [32]byte
+}
+
+type DeleteRequest struct {
+	MsgType  uint8
+	Filename [128]byte
+}
+
+type DeleteResponse struct {
+	MsgType   uint8
+	IsSuccess bool
+}
+
+type LsRequest struct {
+	MsgType  uint8
+	Filename [128]byte
+}
+
+type LsResponse struct {
+	MsgType        uint8
+	DataNodeIPList [NumReplica]uint32
 }
 
 type NodeID struct {
