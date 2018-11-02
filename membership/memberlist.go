@@ -118,6 +118,7 @@ func (ml *MemberList) Delete(ts uint64, ip uint32) error {
 		// Replace the delete member with the last member
 		ml.Members[idx] = ml.Members[ml.size-1]
 		ml.size -= 1
+		sort.Sort(ml)
 		Logger.Info("Delete member (%d, %d)\n", ts, ip)
 		return nil
 	} else {
