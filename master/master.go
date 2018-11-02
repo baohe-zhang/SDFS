@@ -101,6 +101,28 @@ func (mn *masterNode) HandleDeleteRequest(drMsg utils.DeleteRequest, conn net.Co
 	return
 }
 
+func (mn *masterNode) HandleListRequest(lrMsg utils.ListRequest, conn net.Conn) {
+	filename := utils.ParseFilename(lrMsg.Filename[:])
+	fmt.Println("filename ", filename)
+	filenameHash := utils.HashFilename(filename)
+	info, ok := meta.FileInfo(utils.Hash2Text(filenameHash[:]))
+	lr := utils.ListResponse{MsgType: utils.ListResponseMsg}
+	var dnList [utils.NumReplica]uint32
+	for index, value := range info.DataNodes {
+		if ok == true {
+			dnList[index] = value.IP
+		} else {
+			dnList[index] = 0
+		}
+	}
+
+	lr.DataNodeIPList = dnList
+
+	bin := utils.Serialize(lr)
+	conn.Write(bin)
+	return
+}
+
 func (mn *masterNode) Handle(conn net.Conn) {
 	buf := make([]byte, 4096)
 	n, err := conn.Read(buf)

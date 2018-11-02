@@ -176,7 +176,7 @@ func getCommand(masterConn net.Conn, sdfsfile string, localfile string) {
 	fileGet(response, localfile)
 }
 
-// Delete command execution for simpleDFS client
+// Delete a SDFSFile command execution for simpleDFS client
 func deleteCommand(masterConn net.Conn, sdfsfile string) {
 	drPacket := utils.DeleteRequest{MsgType: utils.DeleteRequestMsg}
 	copy(drPacket.Filename[:], sdfsfile)
@@ -199,7 +199,41 @@ func deleteCommand(masterConn net.Conn, sdfsfile string) {
 	if response.IsSuccess {
 		fmt.Printf("SDFS File %s successfully deleted\n", sdfsfile)
 	} else {
-		fmt.Println("SDFS File %s does not exist\n", sdfsfile)
+		fmt.Printf("SDFS File %s does not exist\n", sdfsfile)
+	}
+
+}
+
+// List a SDFSFile command execution for simpleDFS client
+func lsCommand(masterConn net.Conn, sdfsfile string) {
+	lrPacket := utils.ListRequest{MsgType: utils.ListRequestMsg}
+	copy(lrPacket.Filename[:], sdfsfile)
+
+	bin := utils.Serialize(lrPacket)
+	_, err := masterConn.Write(bin)
+	printErrorExit(err)
+
+	buf := make([]byte, BufferSize)
+	n, err := masterConn.Read(buf)
+	printErrorExit(err)
+
+	response := utils.ListResponse{}
+	utils.Deserialize(buf[:n], &response)
+	if response.MsgType != utils.ListResponseMsg {
+		fmt.Println("Unexpected message from MasterNode")
+		return
+	}
+
+	if response.DataNodeIPList[0] == 0 {
+		fmt.Printf("SDFS File %s does not exist\n", sdfsfile)
+	} else {
+		fmt.Println("SDFS File ", sdfsfile, " stores in below list")
+		for _, value := range response.DataNodeIPList {
+			if value == 0 {
+				break
+			}
+			fmt.Println(utils.StringIP(value))
+		}
 	}
 
 }
@@ -260,6 +294,8 @@ func main() {
 			usage()
 		}
 		fmt.Println(args[1:])
+		sdfsfile := args[1]
+		deleteCommand(masterConn, sdfsfile)
 	case "store":
 		if len(args) != 1 {
 			fmt.Println("Invalid store usage")

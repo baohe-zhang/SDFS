@@ -14,8 +14,8 @@ const (
 	ReadRequestMsg    = 8
 	DeleteRequestMsg  = 9
 	DeleteResponseMsg = 10
-	LsRequestMsg      = 11
-	LsResponseMsg     = 12
+	ListRequestMsg    = 11
+	ListResponseMsg   = 12
 )
 
 type PutRequest struct {
@@ -81,12 +81,12 @@ type DeleteResponse struct {
 	IsSuccess bool
 }
 
-type LsRequest struct {
+type ListRequest struct {
 	MsgType  uint8
 	Filename [128]byte
 }
 
-type LsResponse struct {
+type ListResponse struct {
 	MsgType        uint8
 	DataNodeIPList [NumReplica]uint32
 }
