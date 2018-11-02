@@ -30,7 +30,20 @@ func NewDataNode(port string, memberList *membership.MemberList, nodeID utils.No
 	return &dn
 }
 
-func (dn *dataNode) Listener(port string) {
+func (dn *dataNode) Listener() {
+	ln, err := net.Listen("tcp", ":"+dn.NodePort)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		go dn.Handler(conn)
+	}
+
 }
 
 func (dn *dataNode) Handler(conn net.Conn) {
@@ -196,7 +209,7 @@ func (dn *dataNode) dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 	}
 	fmt.Println("Get Node ID")
 
-	conn, err := net.Dial("tcp", utils.StringIP(dn.NodeID.IP)+":"+dn.NodePort)
+	conn, err := net.Dial("tcp", utils.StringIP(nodeID.IP)+":"+dn.NodePort)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +222,7 @@ func (dn *dataNode) dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 	n, err := conn.Read(buf)
 	for string(buf[:n]) != "OK" {
 	}
-	fmt.Printf("node %d ready to receive file", nodeID)
+	fmt.Printf("node %v ready to receive file", nodeID)
 
 	return &conn, nil
 }
@@ -228,16 +241,5 @@ func (dn *dataNode) getNexthopID(nodeList []utils.NodeID) (utils.NodeID, error) 
 func (dn *dataNode) Start() {
 	meta = utils.NewMeta("meta.json")
 
-	ln, err := net.Listen("tcp", ":"+dn.NodePort)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-		go dn.Handler(conn)
-	}
+	dn.Listener()
 }
