@@ -225,15 +225,6 @@ func (dn *dataNode) getNexthopID(nodeList []utils.NodeID) (utils.NodeID, error) 
 	return utils.NodeID{}, errors.New("Nexthop doesn't exists")
 }
 
-func (dn *dataNode) getNodeID() (uint8, error) {
-	for k, v := range dn.MemberList.Members {
-		if dn.NodeID.IP == v.IP {
-			return uint8(k), nil
-		}
-	}
-	return 255, errors.New("hostname doesn't match any nodeID")
-}
-
 func (dn *dataNode) Start() {
 	meta = utils.NewMeta("meta.json")
 

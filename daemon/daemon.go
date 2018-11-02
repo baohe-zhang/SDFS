@@ -35,7 +35,4 @@ func main() {
 	go node.Start()
 
 	membership.Start(masterIP, fmt.Sprintf("%d", membershipPort))
-
-	/*for membership.CurrentList.Size() <= 2 {*/
-	/*}*/
 }
