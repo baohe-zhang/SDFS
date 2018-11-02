@@ -146,7 +146,12 @@ func (dn *dataNode) fileWriter(conn net.Conn, rr utils.ReadRequest) {
 
 	// Retrieve local filename from read request and meta data
 	filename := utils.Hash2Text(rr.FilenameHash[:])
-	info := meta.FileInfo(filename)
+	info, ok := meta.FileInfo(filename)
+	if ok == false {
+		conn.Write([]byte(" "))
+		fmt.Println("Local file requested not found")
+		return
+	}
 	timestamp := fmt.Sprintf("%d", info.Timestamp)
 	filename = filename + ":" + timestamp
 
