@@ -25,13 +25,13 @@ const (
 	StateMonit         = 0x01 << 2
 	StateIntro         = 0x01 << 3
 	InitTimeoutPeriod  = 2000 * time.Millisecond
-	PingTimeoutPeriod  = 1000 * time.Millisecond
+	PingTimeoutPeriod  = 2000 * time.Millisecond
 	PingSendingPeriod  = 250 * time.Millisecond
-	SuspectPeriod      = 1000 * time.Millisecond
-	PingIntroPeriod    = 5000 * time.Millisecond
+	SuspectPeriod      = 2000 * time.Millisecond
 	UpdateDeletePeriod = 15000 * time.Millisecond
 	LeaveDelayPeriod   = 2000 * time.Millisecond
-	TTL_               = 3
+	TimeToLive   = 3
+	HeaderLength = 4
 )
 
 type Header struct {
@@ -49,27 +49,38 @@ type Update struct {
 	MemberState     uint8
 }
 
-var init_timer *time.Timer
-var PingAckTimeout map[uint16]*time.Timer
-var FailureTimeout map[[2]uint64]*time.Timer
-var CurrentMember *Member
-var CurrentList *MemberList
-var LocalIP string
+var initTimer *time.Timer
+var SuspectTimerMap map[uint16]*time.Timer
+var FailureTimerMap map[[2]uint64]*time.Timer
+var MyMember *Member
+var MyList *MemberList
+var MyIP string
 
 var IntroducerIP string
-var Port string
+var MembershipPort string
 
-var DuplicateUpdateCaches map[uint64]uint8
-var TTLCaches *TtlCache
+var DuplicateUpdateMap map[uint64]bool
+var UpdateCacheList *TtlCache
 var Logger *ssmsLogger
 
-var global_wg sync.WaitGroup
+var wg sync.WaitGroup // Block goroutines until user type join
+var mutex sync.Mutex // Mutex used for duplicate update caches write
 
-// mutex used for duplicate update caches write
-var mutex sync.Mutex
+// Convert struct to byte array
+func serialize(data interface{}) []byte {
+	buf := bytes.Buffer{}
+	binary.Write(&buf, binary.BigEndian, data)
+	return buf.Bytes()
+}
+
+// Convery byte array to struct
+func deserialize(data []byte, sample interface{}) {
+	buf := bytes.NewReader(data)
+	binary.Read(buf, binary.BigEndian, sample)
+}
 
 // A trick to simply get local IP address
-func getLocalIP() net.IP {
+func getMyIP() net.IP {
 	dial, err := net.Dial("udp", "8.8.8.8:80")
 	printError(err)
 	localAddr := dial.LocalAddr().(*net.UDPAddr)
@@ -101,140 +112,100 @@ func printError(err error) {
 	}
 }
 
-// UDP send
-func udpSend(addr string, packet []byte) {
+// Send UDP packet
+func sendUDP(addr string, packet []byte) {
 	conn, err := net.Dial("udp", addr)
 	printError(err)
 	defer conn.Close()
+
 	conn.Write(packet)
 }
 
-// UDP Daemon loop task
-func udpDaemon() {
-	serverAddr := Port
-	udpAddr, err := net.ResolveUDPAddr("udp4", serverAddr)
-	printError(err)
-	// Listen the request
-	listen, err := net.ListenUDP("udp", udpAddr)
-	printError(err)
+func daemon() {
+	cc := make(chan string)
+	go readCommand(cc)
 
-	userCmd := make(chan string)
+	wg.Add(1) // Wait until user type join
 
-	go readCommand(userCmd)
+	go packetListenner() // Packet listening goroutine
+	go periodicPing() // Packet sending goroutine
 
-	global_wg.Add(1)
-	go udpDaemonHandle(listen)
-	go periodicPing()
-	//go periodicPingIntroducer()
-	handleCommand(userCmd)
+	commandHandler(cc) // Client goroutine, listen to user's input
 }
 
 // Concurrently read user input by chanel
-func readCommand(input chan<- string) {
+func readCommand(c chan<- string) {
 	for {
 		var cmd string
 		_, err := fmt.Scanln(&cmd)
-		if err != nil {
-			fmt.Println(err)
-		}
-		input <- cmd
+		printError(err)
+		c <- cmd
 	}
 }
 
 // Handle user input command
-func handleCommand(userCmd chan string) {
+func commandHandler(c chan string) {
 	for {
-		s := <-userCmd
+		s := <-c
 		switch s {
+
 		case "join":
-			if CurrentList.Size() > 0 {
+			if MyList.Size() > 0 {
 				fmt.Println("Already in the group")
 				continue
 			}
-			global_wg.Done()
+			wg.Done() // Notify other gorountne that this process have joined the membership
 
-			if LocalIP == IntroducerIP {
-				CurrentMember.State |= (StateIntro | StateMonit)
-				CurrentList.Insert(CurrentMember)
+			if MyIP == IntroducerIP {
+				MyMember.State |= (StateIntro | StateMonit)
+				MyList.Insert(MyMember)
 			} else {
 				// New member, send Init Request to the introducer
-				initRequest(CurrentMember)
+				initRequest(MyMember)
 			}
 
-		case "showlist":
-			CurrentList.PrintMemberList()
+		case "ls":
+			MyList.PrintMemberList()
 
-		case "showid":
-			fmt.Printf("Member (%d, %s)\n", CurrentMember.TimeStamp, LocalIP)
+		case "id":
+			fmt.Printf("Member (%d, %s)\n", MyMember.TimeStamp, MyIP)
 
 		case "leave":
-			if CurrentList.Size() < 1 {
+			if MyList.Size() < 1 {
 				fmt.Println("Haven't join the group")
 				continue
 			}
-			global_wg.Add(1)
+			wg.Add(1)
 			initiateLeave()
 
-		default:
-			fmt.Println("Invalid Command, Please use correct one")
+		case "help":
 			fmt.Println("# join")
-			fmt.Println("# showlist")
-			fmt.Println("# showid")
+			fmt.Println("# ls")
+			fmt.Println("# id")
 			fmt.Println("# leave")
+
+		default: 
+
 		}
 	}
 
-}
-
-func initiateLeave() {
-	uid := TTLCaches.RandGen.Uint64()
-	update := Update{uid, TTL_, MemUpdateLeave, CurrentMember.TimeStamp, CurrentMember.IP, CurrentMember.State}
-	// Clear current ttl cache and add delete update to the cache
-	TTLCaches = NewTtlCache()
-	TTLCaches.Set(&update)
-	isUpdateDuplicate(uid)
-	Logger.Info("Member (%d, %s) leaves", CurrentMember.TimeStamp, LocalIP)
-	time.Sleep(LeaveDelayPeriod)
-	Initilize()
-}
-
-func periodicPingIntroducer() {
-	for {
-		global_wg.Wait() // Once leave, Do not execute this function
-		// Periodiclly ping introducer when introducer is failed.
-		// Piggyback it's self member info
-		// Use for introducer revive
-		if (CurrentList.Size() > 0) && (!CurrentList.ContainsIP(ip2int(net.ParseIP(IntroducerIP)))) && (LocalIP != IntroducerIP) {
-			// Construct a join update
-			uid := TTLCaches.RandGen.Uint64()
-			update := Update{uid, TTL_, MemUpdateJoin, CurrentMember.TimeStamp, CurrentMember.IP, CurrentMember.State}
-			isUpdateDuplicate(uid)
-			// Construct a buffer to carry binary update struct
-			var updateBuffer bytes.Buffer
-			binary.Write(&updateBuffer, binary.BigEndian, &update)
-			// Send piggyback Join Update
-			Logger.Info("Introducer failed, try to ping introducer\n")
-			pingWithPayload(&Member{0, ip2int(net.ParseIP(IntroducerIP)), 0}, updateBuffer.Bytes(), MemUpdateJoin)
-		}
-
-		// Ping introducer period
-		time.Sleep(PingIntroPeriod)
-	}
 }
 
 // Periodically ping a randomly selected target
 func periodicPing() {
+	wg.Wait() // Wait for user to type join
+
 	for {
 		// Shuffle membership list and get a member
 		// Only executed when the membership list is not empty
-		if CurrentList.Size() > 0 {
-			member := CurrentList.Shuffle()
+		if MyList.Size() > 0 {
+			member := MyList.Shuffle()
 			// Do not pick itself as the ping target
-			if (member.TimeStamp == CurrentMember.TimeStamp) && (member.IP == CurrentMember.IP) {
+			if (member.TimeStamp == MyMember.TimeStamp) && (member.IP == MyMember.IP) {
 				time.Sleep(PingSendingPeriod)
 				continue
 			}
-			Logger.Info("Member (%d, %d) is selected by shuffling\n", member.TimeStamp, member.IP)
+			Logger.Info("Member (%d, %d) is selected by shuffling\n", member.TimeStamp, int2ip(member.IP).String())
 			// Get update entry from TTL Cache
 			update, flag, err := getUpdate()
 			// if no update there, do pure ping
@@ -249,187 +220,135 @@ func periodicPing() {
 	}
 }
 
-func udpDaemonHandle(connect *net.UDPConn) {
+func packetListenner() {
+	wg.Wait() // Wait for user to type join
+
+	udpAddr, _ := net.ResolveUDPAddr("udp4", MembershipPort)
+	uconn, err := net.ListenUDP("udp", udpAddr)
+	printError(err)
+	defer uconn.Close()
+
+	// Listening loop
 	for {
-		global_wg.Wait() // Once leave, stop receiving messages
-		// Making a buffer to accept the grep command content from client
-		buffer := make([]byte, 1024)
-		n, addr, err := connect.ReadFromUDP(buffer)
+		packet := make([]byte, 512) // Buffer to store packet
+		n, addr, err := uconn.ReadFromUDP(packet) // Receive packet
 		printError(err)
 
-		// Seperate header and payload
-		const HeaderLength = 4 // Header Length 4 bytes
-
-		// Read header
-		headerBinData := buffer[:HeaderLength]
 		var header Header
-		buf := bytes.NewReader(headerBinData)
-		err = binary.Read(buf, binary.BigEndian, &header)
-		printError(err)
+		deserialize(packet[:HeaderLength], &header)
 
-		// Read payload
-		payload := buffer[HeaderLength:n]
+		packetHandler(header, packet[HeaderLength:n], addr) // Maybe concurrent
+	}
+}
 
-		// Resume detection
+func packetHandler(header Header, payload []byte, addr *net.UDPAddr) {
+	if header.Type&Ping != 0 {
 
-		if header.Type&Ping != 0 {
+		Logger.Info("Receive Ping from %s with seq %d\n", addr.IP.String(), header.Seq)
 
-			reserved := uint8(0x00)
-			// Check whether this ping's source IP is within the memberlist
-			// IF not, set reserved 0xff, ask for sender's join update
-			// init request will not participate this procedure
-			// Because every new join member is unknown to the introducer
-			if (!CurrentList.ContainsIP(ip2int(addr.IP))) && (header.Type&MemInitRequest == 0) {
-				reserved = 0xff
-				Logger.Info("Receive ping from unknown member, set reserved field 0xff")
+		if header.Type&MemInitRequest != 0 {
+			Logger.Info("Receive init request from %s: with seq %d\n", addr.IP.String(), header.Seq)
+			initReply(addr.IP.String(), header.Seq, payload)
+
+		} else if header.Type&MemUpdateSuspect != 0 {
+			Logger.Info("Handle suspect update sent from %s\n", addr.IP.String())
+			handleSuspect(payload)
+			replyAck(header, addr)
+
+		} else if header.Type&MemUpdateResume != 0 {
+			Logger.Info("Handle resume update sent from %s\n", addr.IP.String())
+			handleResume(payload)
+			replyAck(header, addr)
+
+		} else if header.Type&MemUpdateLeave != 0 {
+			Logger.Info("Handle leave update sent from %s\n", addr.IP.String())
+			handleLeave(payload)
+			replyAck(header, addr)
+
+		} else if header.Type&MemUpdateJoin != 0 {
+			Logger.Info("Handle join update sent from %s\n", addr.IP.String())
+			handleJoin(payload)
+			replyAck(header, addr)
+
+		} else {
+			Logger.Info("Receive pure ping sent from %s\n", addr.IP.String())
+			replyAck(header, addr)
+		}
+
+	} else if header.Type&Ack != 0 {
+
+		timer, exist := SuspectTimerMap[header.Seq-1] // Receive Ack, stop ping timer
+		if exist {
+			timer.Stop()
+			Logger.Info("Receive Ack from %s with seq %d\n", addr.IP.String(), header.Seq)
+			delete(SuspectTimerMap, header.Seq-1) // Delete timer to avoid memory overflow
+		}
+
+		if header.Type&MemInitReply != 0 {
+			stop := initTimer.Stop() // Stop init timer 
+			if stop {
+				Logger.Info("Receive init reply from %s with %d\n", addr.IP.String(), header.Seq)
 			}
+			handleInitReply(payload)
 
-			// Check whether this ping carries Init Request
-			if header.Type&MemInitRequest != 0 {
-				// Handle Init Request
-				Logger.Info("Receive Init Request from %s: with seq %d\n", addr.IP.String(), header.Seq)
-				initReply(addr.IP.String(), header.Seq, payload)
+		} else if header.Type&MemUpdateSuspect != 0 {
+			Logger.Info("Handle suspect update sent from %s\n", addr.IP.String())
+			handleSuspect(payload)
 
-			} else if header.Type&MemUpdateSuspect != 0 {
-				Logger.Info("Handle suspect update sent from %s\n", addr.IP.String())
-				handleSuspect(payload)
-				// Get update entry from TTL Cache
-				update, flag, err := getUpdate()
-				// if no update there, do pure ping
-				if err != nil {
-					ack(addr.IP.String(), header.Seq, reserved)
-				} else {
-					// Send update as payload of ping
-					ackWithPayload(addr.IP.String(), header.Seq, update, flag, reserved)
-				}
+		} else if header.Type&MemUpdateResume != 0 {
+			Logger.Info("Handle resume update sent from %s\n", addr.IP.String())
+			handleResume(payload)
 
-			} else if header.Type&MemUpdateResume != 0 {
-				Logger.Info("Handle resume update sent from %s\n", addr.IP.String())
-				handleResume(payload)
-				// Get update entry from TTL Cache
-				update, flag, err := getUpdate()
-				// if no update there, do pure ping
-				if err != nil {
-					ack(addr.IP.String(), header.Seq, reserved)
-				} else {
-					// Send update as payload of ping
-					ackWithPayload(addr.IP.String(), header.Seq, update, flag, reserved)
-				}
+		} else if header.Type&MemUpdateLeave != 0 {
+			Logger.Info("Handle leave update sent from %s\n", addr.IP.String())
+			handleLeave(payload)
 
-			} else if header.Type&MemUpdateLeave != 0 {
-				Logger.Info("Handle leave update sent from %s\n", addr.IP.String())
-				handleLeave(payload)
-				// Get update entry from TTL Cache
-				update, flag, err := getUpdate()
-				// if no update there, do pure ping
-				if err != nil {
-					ack(addr.IP.String(), header.Seq, reserved)
-				} else {
-					// Send update as payload of ping
-					ackWithPayload(addr.IP.String(), header.Seq, update, flag, reserved)
-				}
+		} else if header.Type&MemUpdateJoin != 0 {
+			Logger.Info("Handle join update sent from %s\n", addr.IP.String())
+			handleJoin(payload)
 
-			} else if header.Type&MemUpdateJoin != 0 {
-				Logger.Info("Handle join update sent from %s\n", addr.IP.String())
-				handleJoin(payload)
-				// Get update entry from TTL Cache
-				update, flag, err := getUpdate()
-				// if no update there, do pure ping
-				if err != nil {
-					ack(addr.IP.String(), header.Seq, reserved)
-				} else {
-					// Send update as payload of ping
-					ackWithPayload(addr.IP.String(), header.Seq, update, flag, reserved)
-				}
-
-			} else {
-				// Ping with no payload,
-				// No handling payload needed
-				// Check whether update sending needed
-				// If no, simply reply with ack
-				ack(addr.IP.String(), header.Seq, reserved)
-			}
-
-		} else if header.Type&Ack != 0 {
-
-			// Receive Ack, stop ping timer
-			timer, ok := PingAckTimeout[header.Seq-1]
-			if ok {
-				timer.Stop()
-				Logger.Info("Receive ACK from [%s] with seq %d\n", addr.IP.String(), header.Seq)
-				delete(PingAckTimeout, header.Seq-1)
-			}
-
-			// Check header's reserved field
-			// If reserved field is 0xff, means this handler is missing in someone else's memberlist,
-			// Hence disseminate join update
-			/*if header.Reserved == 0xff {*/
-			//uid := TTLCaches.RandGen.Uint64()
-			//update := Update{uid, TTL_, MemUpdateJoin, CurrentMember.TimeStamp, CurrentMember.IP, CurrentMember.State}
-			//TTLCaches.Set(&update)
-			//isUpdateDuplicate(uid)
-			//Logger.Info("Receive header with reserved 0xff, disseminate join update")
-			/*}*/
-
-			// Read payload
-			payload := buffer[HeaderLength:n]
-
-			if header.Type&MemInitReply != 0 {
-				// Ack carries Init Reply, stop init timer
-				stop := init_timer.Stop()
-				if stop {
-					Logger.Info("Receive Init Reply from [%s] with %d\n", addr.IP.String(), header.Seq)
-				}
-				handleInitReply(payload)
-
-			} else if header.Type&MemUpdateSuspect != 0 {
-				Logger.Info("Handle suspect update sent from %s\n", addr.IP.String())
-				handleSuspect(payload)
-
-			} else if header.Type&MemUpdateResume != 0 {
-				Logger.Info("Handle resume update sent from %s\n", addr.IP.String())
-				handleResume(payload)
-
-			} else if header.Type&MemUpdateLeave != 0 {
-				Logger.Info("Handle leave update sent from %s\n", addr.IP.String())
-				handleLeave(payload)
-
-			} else if header.Type&MemUpdateJoin != 0 {
-				Logger.Info("Handle join update sent from %s\n", addr.IP.String())
-				handleJoin(payload)
-
-			} else {
-				Logger.Info("Receive pure ack sent from %s\n", addr.IP.String())
-			}
+		} else {
+			Logger.Info("Receive pure ack sent from %s\n", addr.IP.String())
 		}
 	}
 }
 
-// Check whether the update is duplicated
-// If duplicated, return false, else, return true and start a timer
+func replyAck(header Header, addr *net.UDPAddr) {
+	update, flag, err := getUpdate()
+	if err != nil {
+		ack(addr.IP.String(), header.Seq)
+	} else {
+		ackWithPayload(addr.IP.String(), header.Seq, update, flag)
+	}
+}
+
+// Check whether the update is duplicate
+// if duplicated, return false, else, return true and start a timer
 func isUpdateDuplicate(id uint64) bool {
 	mutex.Lock()
-	_, ok := DuplicateUpdateCaches[id]
+	_, exist := DuplicateUpdateMap[id] // Check existence
 	mutex.Unlock()
-	if ok {
-		Logger.Info("Receive duplicated update %d\n", id)
+
+	if exist {
+		Logger.Info("Receive duplicate update %d\n", id)
 		return true
+
 	} else {
 		mutex.Lock()
-		DuplicateUpdateCaches[id] = 1 // add to cache
+		DuplicateUpdateMap[id] = true // Add to cache
 		mutex.Unlock()
-		Logger.Info("Add update %d to duplicated cache table \n", id)
-		recent_update_timer := time.NewTimer(UpdateDeletePeriod) // set a delete timer
+		Logger.Info("Add update %d to duplicate cache map \n", id)
+		updateDeleteTimer := time.NewTimer(UpdateDeletePeriod) // set a delete timer
 		go func() {
-			<-recent_update_timer.C
+			<-updateDeleteTimer.C
 			mutex.Lock()
-			_, ok := DuplicateUpdateCaches[id]
+			_, exist := DuplicateUpdateMap[id]
 			mutex.Unlock()
-			if ok {
+			if exist {
 				mutex.Lock()
-				delete(DuplicateUpdateCaches, id) // delete from cache
+				delete(DuplicateUpdateMap, id) // Delete from cache
 				mutex.Unlock()
-				Logger.Info("Delete update %d from duplicated cache table \n", id)
+				Logger.Info("Delete update %d from duplicated cache map \n", id)
 			}
 		}()
 		return false
@@ -439,7 +358,7 @@ func isUpdateDuplicate(id uint64) bool {
 func getUpdate() ([]byte, uint8, error) {
 	var binBuffer bytes.Buffer
 
-	update, err := TTLCaches.Get()
+	update, err := UpdateCacheList.Get()
 	if err != nil {
 		return binBuffer.Bytes(), 0, err
 	}
@@ -448,223 +367,208 @@ func getUpdate() ([]byte, uint8, error) {
 	return binBuffer.Bytes(), update.UpdateType, nil
 }
 
-func handleSuspect(payload []byte) {
-	buf := bytes.NewReader(payload)
-	var update Update
-	err := binary.Read(buf, binary.BigEndian, &update)
-	printError(err)
-
-	// Retrieve update ID
-	updateID := update.UpdateID
-	if !isUpdateDuplicate(updateID) {
-		// If find someone sends suspect update which
-		// suspect self, tell them I am alvie
-		if CurrentMember.TimeStamp == update.MemberTimeStamp && CurrentMember.IP == update.MemberIP {
-			addUpdate2Cache(CurrentMember, MemUpdateResume)
-			return
-		}
-		// Receive new update, handle it
-		CurrentList.Update(update.MemberTimeStamp, update.MemberIP, update.MemberState)
-		TTLCaches.Set(&update)
-		failure_timer := time.NewTimer(SuspectPeriod)
-		FailureTimeout[[2]uint64{update.MemberTimeStamp, uint64(update.MemberIP)}] = failure_timer
-		go func() {
-			<-failure_timer.C
-			Logger.Info("[Failure Detected](%s, %d) Failed, detected by others\n", int2ip(update.MemberIP).String(), update.MemberTimeStamp)
-			err := CurrentList.Delete(update.MemberTimeStamp, update.MemberIP)
-			printError(err)
-			delete(FailureTimeout, [2]uint64{update.MemberTimeStamp, uint64(update.MemberIP)})
-		}()
-
-	}
-}
-
-func handleResume(payload []byte) {
-	buf := bytes.NewReader(payload)
-	var update Update
-	err := binary.Read(buf, binary.BigEndian, &update)
-	printError(err)
-
-	// Retrieve update ID
-	updateID := update.UpdateID
-	if !isUpdateDuplicate(updateID) {
-		// Receive new update, handle it
-		timer, ok := FailureTimeout[[2]uint64{update.MemberTimeStamp, uint64(update.MemberIP)}]
-		if ok {
-			timer.Stop()
-			delete(FailureTimeout, [2]uint64{update.MemberTimeStamp, uint64(update.MemberIP)})
-		}
-		err := CurrentList.Update(update.MemberTimeStamp, update.MemberIP, update.MemberState)
-		// If the resume target is not in the list, insert it to the list
-		if err != nil {
-			CurrentList.Insert(&Member{update.MemberTimeStamp, update.MemberIP, update.MemberState})
-		}
-		TTLCaches.Set(&update)
-	}
-}
-
-func handleLeave(payload []byte) {
-	buf := bytes.NewReader(payload)
-	var update Update
-	err := binary.Read(buf, binary.BigEndian, &update)
-	printError(err)
-
-	// Retrieve update ID
-	updateID := update.UpdateID
-	if !isUpdateDuplicate(updateID) {
-		// Receive new update, handle it
-		CurrentList.Delete(update.MemberTimeStamp, update.MemberIP)
-		TTLCaches.Set(&update)
-	}
-}
-
-func handleJoin(payload []byte) {
-	buf := bytes.NewReader(payload)
-	var update Update
-	err := binary.Read(buf, binary.BigEndian, &update)
-	printError(err)
-
-	// Retrieve update ID
-	updateID := update.UpdateID
-	if !isUpdateDuplicate(updateID) {
-		// Receive new update, handle it
-		CurrentList.Insert(&Member{update.MemberTimeStamp, update.MemberIP,
-			update.MemberState})
-		TTLCaches.Set(&update)
-		// Introducer diseeminate its info when receives join
-		/*if LocalIP == IntroducerIP {*/
-		//uid := TTLCaches.RandGen.Uint64()
-		//reply_update := Update{uid, TTL_, MemUpdateJoin, CurrentMember.TimeStamp, CurrentMember.IP, CurrentMember.State}
-		//TTLCaches.Set(&reply_update)
-		//isUpdateDuplicate(uid)
-		//Logger.Info("Introducer set its info update to the cache\n")
-		/*}*/
-	}
-}
-
 // Generate a new update and set it in TTL Cache
-func addUpdate2Cache(member *Member, updateType uint8) {
-	uid := TTLCaches.RandGen.Uint64()
-	update := Update{uid, TTL_, updateType, member.TimeStamp, member.IP, member.State}
-	TTLCaches.Set(&update)
+func addUpdateToCache(member *Member, updateType uint8) {
+	uid := UpdateCacheList.RandGen.Uint64()
+	update := Update{uid, TimeToLive, updateType, member.TimeStamp, member.IP, member.State}
+	UpdateCacheList.Set(&update)
 	// This daemon is the update producer, add this update to the update duplicate cache
 	isUpdateDuplicate(uid)
 }
 
-// Handle the full membership list(InitReply) received from introducer
+func handleSuspect(payload []byte) {
+	var update Update
+	deserialize(payload, &update)
+
+	updateID := update.UpdateID
+	if !isUpdateDuplicate(updateID) {
+		// If someone suspect me, tell them I am alvie
+		if MyMember.TimeStamp == update.MemberTimeStamp && MyMember.IP == update.MemberIP {
+			addUpdateToCache(MyMember, MemUpdateResume)
+			return
+		}
+		// Someone else is being suspected
+		MyList.Update(update.MemberTimeStamp, update.MemberIP, update.MemberState)
+		UpdateCacheList.Set(&update)
+		timer := time.NewTimer(SuspectPeriod)
+		FailureTimerMap[[2]uint64{update.MemberTimeStamp, uint64(update.MemberIP)}] = timer
+		go func() {
+			<-timer.C
+			err := MyList.Delete(update.MemberTimeStamp, update.MemberIP)
+			if err == nil {
+				Logger.Info("[Failure Detected](%s, %d) Failed, detected by suspect update\n", int2ip(update.MemberIP).String(), update.MemberTimeStamp)
+			}
+			delete(FailureTimerMap, [2]uint64{update.MemberTimeStamp, uint64(update.MemberIP)})
+		}()
+	}
+}
+
+func handleResume(payload []byte) {
+	var update Update
+	deserialize(payload, &update)
+
+	updateID := update.UpdateID
+	if !isUpdateDuplicate(updateID) {
+		timer, exist := FailureTimerMap[[2]uint64{update.MemberTimeStamp, uint64(update.MemberIP)}]
+		if exist {
+			timer.Stop()
+			delete(FailureTimerMap, [2]uint64{update.MemberTimeStamp, uint64(update.MemberIP)})
+		}
+		err := MyList.Update(update.MemberTimeStamp, update.MemberIP, update.MemberState)
+		// If the resume target is not in the list, insert it to the list
+		if err != nil {
+			MyList.Insert(&Member{update.MemberTimeStamp, update.MemberIP, update.MemberState})
+		}
+		UpdateCacheList.Set(&update)
+	}
+}
+
+func handleLeave(payload []byte) {
+	var update Update
+	deserialize(payload, &update)
+
+	updateID := update.UpdateID
+	if !isUpdateDuplicate(updateID) {
+		MyList.Delete(update.MemberTimeStamp, update.MemberIP)
+		UpdateCacheList.Set(&update)
+	}
+}
+
+func handleJoin(payload []byte) {
+	var update Update
+	deserialize(payload, &update)
+
+	updateID := update.UpdateID
+	if !isUpdateDuplicate(updateID) {
+		MyList.Insert(&Member{update.MemberTimeStamp, update.MemberIP, update.MemberState})
+		UpdateCacheList.Set(&update)
+	}
+}
+
 func handleInitReply(payload []byte) {
 	num := len(payload) / 13 // 13 bytes per member
 	buf := bytes.NewReader(payload)
 	for idx := 0; idx < num; idx++ {
 		var member Member
-		err := binary.Read(buf, binary.BigEndian, &member)
-		printError(err)
-		// Insert existing member to the new member's list
-		CurrentList.Insert(&member)
+		binary.Read(buf, binary.BigEndian, &member)
+		MyList.Insert(&member) // Insert other member to the new member's memberlist
 	}
 }
 
-// Introducer replies new node join init request and
-// send the new node join updates to others in membership
+// Introducer replies new node join init request and send the new node join updates to others members
 func initReply(addr string, seq uint16, payload []byte) {
-	// Read and insert new member to the memberlist
-	var member Member
-	buf := bytes.NewReader(payload)
-	err := binary.Read(buf, binary.BigEndian, &member)
-	printError(err)
-	// Update state of the new member
-	// ...
-	CurrentList.Insert(&member)
-	addUpdate2Cache(&member, MemUpdateJoin)
+	var newMember Member
+	deserialize(payload, &newMember)
+	MyList.Insert(&newMember)
+	addUpdateToCache(&newMember, MemUpdateJoin) // Update this new member's join
 
 	// Put the entire memberlist to the Init Reply's payload
 	var memBuffer bytes.Buffer // Temp buf to store member's binary value
 	var binBuffer bytes.Buffer
 
-	for i := 0; i < CurrentList.Size(); i += 1 {
-		member_, _ := CurrentList.RetrieveByIdx(i)
-
-		binary.Write(&memBuffer, binary.BigEndian, member_)
-		binBuffer.Write(memBuffer.Bytes())
+	for i := 0; i < MyList.Size(); i += 1 {
+		member, _ := MyList.RetrieveByIdx(i)
+		binary.Write(&memBuffer, binary.BigEndian, member)
+		binBuffer.Write(memBuffer.Bytes()) // Append existing member's bytes into binBuffer
 		memBuffer.Reset() // Clear buffer
 	}
 
 	// Send pigggback Init Reply
-	ackWithPayload(addr, seq, binBuffer.Bytes(), MemInitReply, 0x00)
+	ackWithPayload(addr, seq, binBuffer.Bytes(), MemInitReply)
 }
 
 func initRequest(member *Member) {
-	// Construct Init Request payload
-	var binBuffer bytes.Buffer
-	binary.Write(&binBuffer, binary.BigEndian, member)
+	// Send piggyback init request
+	pingWithPayload(&Member{0, ip2int(net.ParseIP(IntroducerIP)), 0}, serialize(member), MemInitRequest)
 
-	// Send piggyback Init Request
-	pingWithPayload(&Member{0, ip2int(net.ParseIP(IntroducerIP)), 0}, binBuffer.Bytes(), MemInitRequest)
-
-	// Start Init timer, if expires, exit process
-	init_timer = time.NewTimer(InitTimeoutPeriod)
+	// Start init timer, exit process if the timer expires, init timer stops when the daemon receives init reply
+	initTimer = time.NewTimer(InitTimeoutPeriod)
 	go func() {
-		<-init_timer.C
+		<-initTimer.C
 		Logger.Info("Init %s timeout, process exit\n", IntroducerIP)
 		os.Exit(1)
 	}()
 }
 
-func ackWithPayload(addr string, seq uint16, payload []byte, flag uint8, reserved uint8) {
-	packet := Header{Ack | flag, seq + 1, reserved}
-	var binBuffer bytes.Buffer
-	binary.Write(&binBuffer, binary.BigEndian, packet)
+func initiateLeave() {
+	uid := UpdateCacheList.RandGen.Uint64()
+	update := Update{uid, TimeToLive, MemUpdateLeave, MyMember.TimeStamp, MyMember.IP, MyMember.State}
+	// Clear current update cache list and add delete update to the cache
+	UpdateCacheList = NewTtlCache()
+	UpdateCacheList.Set(&update)
+	isUpdateDuplicate(uid)
+	Logger.Info("Member (%d, %s) leaves", MyMember.TimeStamp, MyIP)
+	time.Sleep(LeaveDelayPeriod)
+	Initilize()
+}
+
+func ackWithPayload(addr string, seq uint16, payload []byte, flag uint8) {
+	header := Header{
+		Type: Ack | flag,
+		Seq: seq + 1,
+		Reserved: 0,
+	}
+
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, header)
 
 	if payload != nil {
-		binBuffer.Write(payload) // Append payload
-		udpSend(addr+Port, binBuffer.Bytes())
+		buf.Write(payload) // Append payload
+		sendUDP(addr+MembershipPort, buf.Bytes())
 	} else {
-		udpSend(addr+Port, binBuffer.Bytes())
+		sendUDP(addr+MembershipPort, buf.Bytes())
 	}
 }
 
-func ack(addr string, seq uint16, reserved uint8) {
-	ackWithPayload(addr, seq, nil, 0x00, reserved)
+func ack(addr string, seq uint16) {
+	ackWithPayload(addr, seq, nil, 0x00)
 }
 
 func pingWithPayload(member *Member, payload []byte, flag uint8) {
-	// Source for genearting random number
+	// Generating random sequence number
 	randSource := rand.NewSource(time.Now().UnixNano())
 	randGen := rand.New(randSource)
 	seq := randGen.Intn(0x01<<15 - 2)
-	addr := int2ip(member.IP).String() + Port
+	addr := int2ip(member.IP).String() + MembershipPort
 
-	packet := Header{Ping | flag, uint16(seq), 0}
-	var binBuffer bytes.Buffer
-	binary.Write(&binBuffer, binary.BigEndian, packet)
+	header := Header{
+		Type: Ping | flag,
+		Seq: uint16(seq),
+		Reserved: 0,
+	}
+
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, header)
 
 	if payload != nil {
-		binBuffer.Write(payload) // Append payload
-		udpSend(addr, binBuffer.Bytes())
+		buf.Write(payload) // Append payload
+		sendUDP(addr, buf.Bytes())
 	} else {
-		udpSend(addr, binBuffer.Bytes())
+		sendUDP(addr, buf.Bytes())
 	}
 	Logger.Info("Ping (%s, %d)\n", addr, seq)
 
-	timer := time.NewTimer(PingTimeoutPeriod)
-	PingAckTimeout[uint16(seq)] = timer
+	// Set timer to detect failure
+	suspectTimer := time.NewTimer(PingTimeoutPeriod)
+	SuspectTimerMap[uint16(seq)] = suspectTimer
 	go func() {
-		<-timer.C
+		<-suspectTimer.C
 		Logger.Info("Ping (%s, %d) timeout\n", addr, seq)
-		err := CurrentList.Update(member.TimeStamp, member.IP, StateSuspect)
+		err := MyList.Update(member.TimeStamp, member.IP, StateSuspect)
 		if err == nil {
-			addUpdate2Cache(member, MemUpdateSuspect)
+			addUpdateToCache(member, MemUpdateSuspect)
 		}
-		delete(PingAckTimeout, uint16(seq))
+		delete(SuspectTimerMap, uint16(seq))
 		// Handle local suspect timeout
-		failure_timer := time.NewTimer(SuspectPeriod)
-		FailureTimeout[[2]uint64{member.TimeStamp, uint64(member.IP)}] = failure_timer
+		failureTimer := time.NewTimer(SuspectPeriod)
+		FailureTimerMap[[2]uint64{member.TimeStamp, uint64(member.IP)}] = failureTimer
 		go func() {
-			<-failure_timer.C
-			Logger.Info("[Failure Detected](%s, %d) Failed, detected by self\n", int2ip(member.IP).String(), member.TimeStamp)
-			err := CurrentList.Delete(member.TimeStamp, member.IP)
-			printError(err)
-			delete(FailureTimeout, [2]uint64{member.TimeStamp, uint64(member.IP)})
+			<-failureTimer.C
+			err := MyList.Delete(member.TimeStamp, member.IP)
+			if err == nil {
+				Logger.Info("[Failure Detected](%s, %d) Failed, detected by self\n", int2ip(member.IP).String(), member.TimeStamp)
+			}
+			delete(FailureTimerMap, [2]uint64{member.TimeStamp, uint64(member.IP)})
 		}()
 	}()
 }
@@ -675,21 +579,22 @@ func ping(member *Member) {
 
 // Start the membership service and join in the group
 func Initilize() bool {
-	// Create self entry
-	LocalIP = getLocalIP().String()
-	Logger = NewSsmsLogger(LocalIP)
+	Logger = NewSsmsLogger(MyIP)
+
+	// Create my member entry
+	MyIP = getMyIP().String()
 	timestamp := time.Now().UnixNano()
-	state := StateAlive
-	CurrentMember = &Member{uint64(timestamp), ip2int(getLocalIP()), uint8(state)}
+	state := StateAlive | StateMonit
+	MyMember = &Member{uint64(timestamp), ip2int(getMyIP()), uint8(state)}
 
 	// Create member list
-	CurrentList = NewMemberList(20)
+	MyList = NewMemberList(20)
 
-	// Make necessary tables
-	PingAckTimeout = make(map[uint16]*time.Timer)
-	FailureTimeout = make(map[[2]uint64]*time.Timer)
-	DuplicateUpdateCaches = make(map[uint64]uint8)
-	TTLCaches = NewTtlCache()
+	// Make necessary Maps
+	SuspectTimerMap = make(map[uint16]*time.Timer)
+	FailureTimerMap = make(map[[2]uint64]*time.Timer)
+	DuplicateUpdateMap = make(map[uint64]bool)
+	UpdateCacheList = NewTtlCache()
 
 	return true
 }
@@ -697,8 +602,8 @@ func Initilize() bool {
 // Main func
 func Start(introducerIP, port string) {
 	IntroducerIP = introducerIP
-	Port = ":" + port
+	MembershipPort = ":" + port
 
 	// Start daemon
-	udpDaemon()
+	daemon()
 }
