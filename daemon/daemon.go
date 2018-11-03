@@ -27,11 +27,11 @@ func main() {
 	}
 
 	if masterIP == localIP {
-		masterNode := master.NewMasterNode(fmt.Sprintf("%d", masternodePort), uint16(datanodePort), membership.CurrentList)
+		masterNode := master.NewMasterNode(fmt.Sprintf("%d", masternodePort), uint16(datanodePort), membership.MyList)
 		go masterNode.Start()
 	}
-	nodeID := utils.NodeID{Timestamp: membership.CurrentMember.TimeStamp, IP: membership.CurrentMember.IP}
-	node := datanode.NewDataNode(fmt.Sprintf("%d", datanodePort), membership.CurrentList, nodeID)
+	nodeID := utils.NodeID{Timestamp: membership.MyMember.TimeStamp, IP: membership.MyMember.IP}
+	node := datanode.NewDataNode(fmt.Sprintf("%d", datanodePort), membership.MyList, nodeID)
 	go node.Start()
 
 	membership.Start(masterIP, fmt.Sprintf("%d", membershipPort))
