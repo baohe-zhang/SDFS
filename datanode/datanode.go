@@ -99,15 +99,22 @@ func (dn *dataNode) reReplicaStat(conn net.Conn, rrrMsg utils.ReReplicaRequest) 
 	fmt.Println("ReplicaStat", hashFilename)
 	_, ok := meta.FileInfo(hashFilename)
 	dn.dialDataNodeReReplica(rrrMsg)
-	meta.UpdateFileInfo(hashFilename, rrrMsg.DataNodeList[:])
 	if ok {
+		fmt.Println("There has been a replica")
 		return
 	}
 
+	connGet, err := net.Dial("tcp", conn.RemoteAddr().(*net.TCPAddr).IP.String()+":"+dn.NodePort)
+	if err != nil {
+		utils.PrintError(err)
+		return
+	}
 	rrr := utils.ReReplicaGet{MsgType: utils.ReReplicaGetMsg, FilenameHash: rrrMsg.FilenameHash}
 	bin := utils.Serialize(rrr)
-	_, err := conn.Write(bin)
+	_, err = connGet.Write(bin)
 	utils.PrintError(err)
+
+	meta.UpdateFileInfo(hashFilename, rrrMsg.DataNodeList[:])
 }
 
 func (dn *dataNode) reReplicaReader(conn net.Conn, rrrMsg utils.ReReplicaResponse) {
