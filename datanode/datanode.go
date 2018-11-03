@@ -43,7 +43,6 @@ func (dn *dataNode) Listener() {
 		}
 		go dn.Handler(conn)
 	}
-
 }
 
 func (dn *dataNode) Handler(conn net.Conn) {
