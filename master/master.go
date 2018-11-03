@@ -133,7 +133,7 @@ func (mn *masterNode) HandleStoreRequest(srMsg utils.StoreRequest, conn net.Conn
 	for _, val := range files {
 		filename := metaFile[val]
 		buf := make([]byte, 128)
-		copy(buf[:], val)
+		copy(buf[:], filename)
 		conn.Write(buf)
 	}
 	return
