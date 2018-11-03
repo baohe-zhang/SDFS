@@ -123,6 +123,21 @@ func (mn *masterNode) HandleListRequest(lrMsg utils.ListRequest, conn net.Conn) 
 	return
 }
 
+func (mn *masterNode) HandleStoreRequest(srMsg utils.StoreRequest, conn net.Conn) {
+	files := meta.FilesIn(utils.BinaryIP(conn.RemoteAddr().String()))
+	sr := utils.StoreResponse{MsgType: utils.StoreResponseMsg, FilesNum: uint32(len(files))}
+
+	bin := utils.Serialize(sr)
+	conn.Write(bin)
+
+	for _, val := range files {
+		buf := make([]byte, 128)
+		copy(buf[:], val)
+		conn.Write(bin)
+	}
+	return
+}
+
 func (mn *masterNode) Handle(conn net.Conn) {
 	buf := make([]byte, 4096)
 	n, err := conn.Read(buf)

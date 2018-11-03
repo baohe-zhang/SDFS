@@ -16,6 +16,8 @@ const (
 	DeleteResponseMsg = 10
 	ListRequestMsg    = 11
 	ListResponseMsg   = 12
+	StoreRequestMsg   = 13
+	StoreResponseMsg  = 14
 )
 
 type PutRequest struct {
@@ -89,6 +91,15 @@ type ListRequest struct {
 type ListResponse struct {
 	MsgType        uint8
 	DataNodeIPList [NumReplica]uint32
+}
+
+type StoreRequest struct {
+	MsgType uint8
+}
+
+type StoreResponse struct {
+	MsgType  uint8
+	FilesNum uint32
 }
 
 type NodeID struct {

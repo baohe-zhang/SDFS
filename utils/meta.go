@@ -67,6 +67,31 @@ func (meta Meta) RmFileInfo(filename string) bool {
 	return false
 }
 
+func (meta Meta) FilesIn(clientIP uint32) []string {
+	res := make([]string, 0)
+	for key, value := range meta {
+		inThisClient := false
+		for _, info := range value {
+			for _, node := range info.DataNodes {
+				if node.IP == clientIP {
+					inThisClient = true
+					break
+				}
+				if inThisClient {
+					break
+				}
+			}
+			if inThisClient {
+				break
+			}
+		}
+		if inThisClient {
+			res = append(res, key)
+		}
+	}
+	return res
+}
+
 func (meta Meta) SortFileInfo(filename string) {
 	infos := meta[filename]
 	n := len(infos)

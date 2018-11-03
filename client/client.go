@@ -227,7 +227,7 @@ func lsCommand(masterConn net.Conn, sdfsfile string) {
 	if response.DataNodeIPList[0] == 0 {
 		fmt.Printf("SDFS File %s does not exist\n", sdfsfile)
 	} else {
-		fmt.Println("SDFS File ", sdfsfile, " stores in below list")
+		fmt.Println("SDFS File", sdfsfile, "stores in below addresses")
 		for _, value := range response.DataNodeIPList {
 			if value == 0 {
 				break
@@ -236,6 +236,39 @@ func lsCommand(masterConn net.Conn, sdfsfile string) {
 		}
 	}
 
+}
+
+// List all SDFSFile stored for simpleDFS client
+func storeCommand(masterConn net.Conn) {
+	srPacket := utils.StoreRequest{MsgType: utils.StoreRequestMsg}
+	bin := utils.Serialize(srPacket)
+	_, err := masterConn.Write(bin)
+	printErrorExit(err)
+
+	buf := make([]byte, BufferSize)
+	n, err := masterConn.Read(buf)
+	printErrorExit(err)
+
+	response := utils.StoreResponse{}
+	utils.Deserialize(buf[:n], &response)
+	if response.MsgType != utils.StoreResponseMsg {
+		fmt.Println("Unexpected message from MasterNode")
+		return
+	}
+
+	if response.FilesNum == 0 {
+		fmt.Println("There is no any files")
+		return
+	}
+
+	for i := uint32(0); i < response.FilesNum; i++ {
+		buf = make([]byte, 128)
+		_, err := masterConn.Read(buf)
+		printErrorExit(err)
+		fmt.Println(utils.ParseFilename(buf))
+	}
+
+	return
 }
 
 func main() {
@@ -302,6 +335,7 @@ func main() {
 			usage()
 		}
 		fmt.Println(args[1:])
+		storeCommand(masterConn)
 	case "get-versions":
 		if len(args) != 4 {
 			fmt.Println("Invalid get-versions usage")
