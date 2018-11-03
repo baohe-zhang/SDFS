@@ -109,6 +109,7 @@ type ReReplicaRequest struct {
 	MsgType      uint8
 	FilenameHash [32]byte
 	DataNodeList [NumReplica]NodeID
+	TimeToLive   uint8
 }
 
 type ReReplicaGet struct {

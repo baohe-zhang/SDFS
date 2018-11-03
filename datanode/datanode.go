@@ -369,6 +369,11 @@ func (dn *dataNode) dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 
 // Dial DataNode with ReReplicaRequest transfer
 func (dn *dataNode) dialDataNodeReReplica(rrr utils.ReReplicaRequest) {
+	rrr.TimeToLive -= 1
+	if rrr.TimeToLive == 0 {
+		return
+	}
+
 	nodeID, err := dn.getNexthopIDCircle(rrr.DataNodeList[:])
 	if err != nil {
 		fmt.Println("Get Node ID failed")
