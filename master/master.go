@@ -165,6 +165,10 @@ func (mn *masterNode) Handle(conn net.Conn) {
 		lr := utils.ListRequest{}
 		utils.Deserialize(buf[:n], &lr)
 		mn.HandleListRequest(lr, conn)
+	case utils.StoreRequestMsg:
+		sr := utils.StoreRequest{}
+		utils.Deserialize(buf[:n], &sr)
+		mn.HandleStoreRequest(sr, conn)
 	default:
 		fmt.Println("Unrecognized packet")
 	}
