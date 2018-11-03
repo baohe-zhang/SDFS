@@ -131,6 +131,7 @@ func (mn *masterNode) HandleStoreRequest(srMsg utils.StoreRequest, conn net.Conn
 	conn.Write(bin)
 
 	for _, val := range files {
+		filename := metaFile[val]
 		buf := make([]byte, 128)
 		copy(buf[:], val)
 		conn.Write(buf)
