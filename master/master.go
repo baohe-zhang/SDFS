@@ -233,6 +233,7 @@ func (mn *masterNode) Start() {
 		utils.PrintError(err)
 		return
 	}
+	go mn.ReReplicaRoutine()
 	for {
 		conn, err := listener.Accept()
 		defer conn.Close()

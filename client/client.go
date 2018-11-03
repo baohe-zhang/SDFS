@@ -86,6 +86,8 @@ func fileGet(gr utils.GetResponse, localfile string) {
 			hasConn = true
 			fmt.Println("Dial ", utils.StringIP(ip), " successful")
 			break
+		} else {
+			continue
 		}
 		defer conn.Close()
 	}
