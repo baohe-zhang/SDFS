@@ -27,7 +27,7 @@ const (
 	InitTimeoutPeriod  = 2000 * time.Millisecond
 	PingTimeoutPeriod  = 1000 * time.Millisecond
 	PingSendingPeriod  = 125 * time.Millisecond
-	SuspectPeriod      = 500 * time.Millisecond
+	SuspectPeriod      = 1000 * time.Millisecond
 	UpdateDeletePeriod = 15000 * time.Millisecond
 	LeaveDelayPeriod   = 2000 * time.Millisecond
 	TimeToLive   = 3
@@ -237,7 +237,7 @@ func packetListenner() {
 		var header Header
 		deserialize(packet[:HeaderLength], &header)
 
-		go packetHandler(header, packet[HeaderLength:n], addr) // Maybe concurrent
+		packetHandler(header, packet[HeaderLength:n], addr) // Maybe concurrent
 	}
 }
 
