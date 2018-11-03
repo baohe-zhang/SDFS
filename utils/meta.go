@@ -53,9 +53,36 @@ func (meta Meta) FileInfo(filename string) (Info, bool) {
 	}
 }
 
+func (meta Meta) FileInfos(filename string) (Infos, bool) {
+	val, ok := meta[filename]
+	if ok {
+		if len(val) < 5 {
+			return val, true
+		} else {
+			return val[:5], true
+		}
+	} else {
+		return Infos{}, false
+	}
+}
+
 func (meta Meta) PutFileInfo(filename string, info Info) {
 	meta[filename] = append(meta[filename], info)
 	meta.SortFileInfo(filename)
+}
+
+func (meta Meta) UpdateFileInfo(filename string, dataNodeList []NodeID) {
+	val, ok := meta[filename]
+	if ok {
+		for i := 0; i < 5; i++ {
+			if i >= len(val) {
+				break
+			}
+			for j, _ := range val[i].DataNodes {
+				val[i].DataNodes[j] = dataNodeList[j]
+			}
+		}
+	}
 }
 
 func (meta Meta) RmFileInfo(filename string) bool {
