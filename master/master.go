@@ -139,6 +139,54 @@ func (mn *masterNode) HandleStoreRequest(srMsg utils.StoreRequest, conn net.Conn
 	return
 }
 
+// Re-replica go routine for consistently check if a file has kept in four replica
+// Send the re-replica request to a node who has this file and pipeline the checking
+func (mn *masterNode) ReReplicaRoutine() {
+	for {
+		for file, info := range meta {
+			filename := metaFile[file]
+			dataNodes := info[0].DataNodes
+			dnList, err := utils.HashReplicaRange(filename, uint32(mn.MemberList.Size()))
+			utils.PrintError(err)
+			rrr := utils.ReReplicaRequest{MsgType: utils.ReReplicaRequestMsg, FilenameHash: utils.HashFilename(filename)}
+			nodeIP := " "
+			isInMeta := false
+			for i, index := range dnList {
+				m, err := mn.MemberList.RetrieveByIdx(int(index))
+				if err != nil {
+					utils.PrintError(err)
+					continue
+				}
+				for _, id := range dataNodes {
+					if id.IP == m.IP && id.Timestamp == m.TimeStamp {
+						isInMeta = true
+						nodeIP = utils.StringIP(id.IP)
+						break
+					}
+				}
+				rrr.DataNodeList[i] = utils.NodeID{Timestamp: m.TimeStamp, IP: m.IP}
+			}
+			if isInMeta {
+				mn.ReReplicaRequest(rrr, nodeIP+":"+utils.StringPort(mn.DNPort))
+			} else {
+				fmt.Println("No applicable replica nodes. Replica failed")
+			}
+		}
+		time.Sleep(30 * time.Second)
+	}
+}
+
+func (mn *masterNode) ReReplicaRequest(rrr utils.ReReplicaRequest, addr string) {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		utils.PrintError(err)
+		fmt.Println("Failed to connect Re-replica node")
+		return
+	}
+
+	conn.Write(utils.Serialize(rrr))
+}
+
 func (mn *masterNode) Handle(conn net.Conn) {
 	buf := make([]byte, 4096)
 	n, err := conn.Read(buf)
@@ -185,6 +233,7 @@ func (mn *masterNode) Start() {
 		utils.PrintError(err)
 		return
 	}
+	go mn.ReReplicaRoutine()
 	for {
 		conn, err := listener.Accept()
 		defer conn.Close()
