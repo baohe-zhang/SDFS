@@ -124,7 +124,7 @@ func (mn *masterNode) HandleListRequest(lrMsg utils.ListRequest, conn net.Conn) 
 }
 
 func (mn *masterNode) HandleStoreRequest(srMsg utils.StoreRequest, conn net.Conn) {
-	files := meta.FilesIn(utils.BinaryIP(conn.RemoteAddr().String()))
+	files := meta.FilesIn(utils.BinaryIP(conn.RemoteAddr().(*net.TCPAddr).IP.String()))
 	sr := utils.StoreResponse{MsgType: utils.StoreResponseMsg, FilesNum: uint32(len(files))}
 
 	bin := utils.Serialize(sr)
