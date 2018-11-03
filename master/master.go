@@ -2,16 +2,16 @@ package master
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"simpledfs/membership"
 	"simpledfs/utils"
 	"time"
-	"math/rand"
 )
 
 var meta utils.Meta
 
-var hasnToFilenameMap map[string]string
+var hashtextToFilenameMap map[string]string
 
 type masterNode struct {
 	Port       string
@@ -34,7 +34,7 @@ func (mn *masterNode) HandlePutRequest(prMsg utils.PutRequest, conn net.Conn) {
 	pr := utils.PutResponse{MsgType: utils.PutResponseMsg}
 	pr.FilenameHash = utils.HashFilename(filename)
 	fmt.Println(utils.Hash2Text(pr.FilenameHash[:]))
-	hasnToFilenameMap[utils.Hash2Text(pr.FilenameHash[:])] = filename
+	hashtextToFilenameMap[utils.Hash2Text(pr.FilenameHash[:])] = filename
 	pr.Filesize = prMsg.Filesize
 	pr.Timestamp = uint64(timestamp)
 	dnList, err := utils.HashReplicaRange(filename, uint32(mn.MemberList.Size()))
@@ -132,7 +132,7 @@ func (mn *masterNode) HandleStoreRequest(srMsg utils.StoreRequest, conn net.Conn
 	conn.Write(bin)
 
 	for _, val := range files {
-		filename := hasnToFilenameMap[val]
+		filename := hashtextToFilenameMap[val]
 		buf := make([]byte, 128)
 		copy(buf[:], filename)
 		conn.Write(buf)
@@ -145,38 +145,38 @@ func (mn *masterNode) HandleStoreRequest(srMsg utils.StoreRequest, conn net.Conn
 func (mn *masterNode) ReReplicaRoutine() {
 	for {
 		for file, info := range meta {
-			filename := hasnToFilenameMap[file]
+			filename := hashtextToFilenameMap[file]
 			dataNodes := info[0].DataNodes
-			dnList, err := utils.HashReplicaRange(filename, uint32(mn.MemberList.Size()))
-			utils.PrintError(err)
 			rrr := utils.ReReplicaRequest{
 				MsgType:      utils.ReReplicaRequestMsg,
 				FilenameHash: utils.HashFilename(filename),
 				TimeToLive:   4,
 			}
-			fmt.Println("Filename Hash", utils.Hash2Text(rrr.FilenameHash[:]))
-			nodeIP := " "
-			isInMeta := false
-			for i, index := range dnList {
-				m, err := mn.MemberList.RetrieveByIdx(int(index))
+
+			ids := make([]utils.NodeID, 0)
+			for _, id := range dataNodes {
+				_, err := mn.MemberList.Retrieve(id.Timestamp, id.IP)
 				if err != nil {
 					utils.PrintError(err)
 					continue
 				}
-				for _, id := range dataNodes {
-					if id.IP == m.IP && id.Timestamp == m.Timestamp {
-						isInMeta = true
-						nodeIP = utils.StringIP(id.IP)
-						break
+				ids = append(ids, id)
+			}
+
+			if len(ids) < utils.NumReplica {
+				picksID := mn.pickReceivers(ids, utils.NumReplica-len(ids))
+				for i := 0; i < utils.NumReplica; i++ {
+					if i < len(ids) {
+						rrr.DataNodeList[i] = ids[i]
+					} else {
+						rrr.DataNodeList[i] = picksID[i-len(ids)]
 					}
 				}
-				rrr.DataNodeList[i] = utils.NodeID{Timestamp: m.Timestamp, IP: m.IP}
-			}
-			if isInMeta {
-				mn.ReReplicaRequest(rrr, nodeIP+":"+utils.StringPort(mn.DNPort))
 			} else {
-				fmt.Println("No applicable replica nodes. Replica failed")
+				continue
 			}
+
+			mn.ReReplicaRequest(rrr, utils.StringIP(rrr.DataNodeList[0].IP)+":"+utils.StringPort(mn.DNPort))
 			meta.UpdateFileInfo(utils.Hash2Text(rrr.FilenameHash[:]), rrr.DataNodeList[:])
 		}
 		time.Sleep(30 * time.Second)
@@ -283,19 +283,14 @@ func (mn *masterNode) pickReceivers(fileHolders []utils.NodeID, num int) []utils
 	return receivers
 }
 
-
 func (mn *masterNode) sendCopyRequest(filename string, timestamp uint64, sender utils.NodeID, receivers []utils.NodeID) {
-	
+
 }
-
-
-
-
 
 func (mn *masterNode) Start() {
 	//meta = utils.NewMeta("MasterMeta")
 	meta = utils.Meta{}
-	hasnToFilenameMap = make(map[string]string)
+	hashtextToFilenameMap = make(map[string]string)
 
 	listener, err := net.Listen("tcp", ":"+mn.Port)
 	if err != nil {
@@ -312,17 +307,3 @@ func (mn *masterNode) Start() {
 		go mn.Handle(conn)
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

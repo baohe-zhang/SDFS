@@ -30,7 +30,7 @@ func main() {
 		masterNode := master.NewMasterNode(fmt.Sprintf("%d", masternodePort), uint16(datanodePort), membership.MyList)
 		go masterNode.Start()
 	}
-	nodeID := utils.NodeID{Timestamp: membership.MyMember.TimeStamp, IP: membership.MyMember.IP}
+	nodeID := utils.NodeID{Timestamp: membership.MyMember.Timestamp, IP: membership.MyMember.IP}
 	node := datanode.NewDataNode(fmt.Sprintf("%d", datanodePort), membership.MyList, nodeID)
 	go node.Start()
 
