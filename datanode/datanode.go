@@ -167,6 +167,7 @@ func (dn *dataNode) reReplicaReader(conn net.Conn, rrrMsg utils.ReReplicaRespons
 }
 
 func (dn *dataNode) reReplicaWriter(conn net.Conn, rrgMsg utils.ReReplicaGet) {
+
 	hashFilename := utils.Hash2Text(rrgMsg.FilenameHash[:])
 	infos, ok := meta.FileInfos(hashFilename)
 	if ok == false {
@@ -175,6 +176,12 @@ func (dn *dataNode) reReplicaWriter(conn net.Conn, rrgMsg utils.ReReplicaGet) {
 	}
 
 	for i := 0; i < len(infos); i++ {
+		connResponse, err := net.Dial("tcp", conn.RemoteAddr().(*net.TCPAddr).IP.String()+":"+dn.NodePort)
+		if err != nil {
+			utils.PrintError(err)
+			return
+		}
+
 		file, err := os.OpenFile(hashFilename+":"+fmt.Sprintf("%d", infos[i].Timestamp), os.O_RDONLY, 0755)
 		utils.PrintError(err)
 
@@ -190,11 +197,11 @@ func (dn *dataNode) reReplicaWriter(conn net.Conn, rrgMsg utils.ReReplicaGet) {
 		}
 
 		bin := utils.Serialize(rrr)
-		_, err = conn.Write(bin)
+		_, err = connResponse.Write(bin)
 		utils.PrintError(err)
 
 		buf := make([]byte, BufferSize)
-		n, err := conn.Read(buf)
+		n, err := connResponse.Read(buf)
 		for string(buf[:n]) != "OK" {
 		}
 		fmt.Println(string(buf[:n]))
@@ -202,7 +209,7 @@ func (dn *dataNode) reReplicaWriter(conn net.Conn, rrgMsg utils.ReReplicaGet) {
 		buf = make([]byte, BufferSize)
 		for {
 			n, err := file.Read(buf)
-			conn.Write(buf[:n])
+			connResponse.Write(buf[:n])
 			if err == io.EOF {
 				fmt.Println("Send ReReplica file finish")
 				break
