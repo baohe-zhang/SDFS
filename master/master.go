@@ -182,7 +182,8 @@ func (mn *masterNode) Start() {
 
 	listener, err := net.Listen("tcp", ":"+mn.Port)
 	if err != nil {
-		// handle error
+		utils.PrintError(err)
+		return
 	}
 	for {
 		conn, err := listener.Accept()
