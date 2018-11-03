@@ -149,7 +149,7 @@ func (mn *masterNode) ReReplicaRoutine() {
 			dnList, err := utils.HashReplicaRange(filename, uint32(mn.MemberList.Size()))
 			utils.PrintError(err)
 			rrr := utils.ReReplicaRequest{MsgType: utils.ReReplicaRequestMsg, FilenameHash: utils.HashFilename(filename)}
-			fmt.Println("Filename Hash", rrr.FilenameHash)
+			fmt.Println("Filename Hash", utils.Hash2Text(rrr.FilenameHash))
 			nodeIP := " "
 			isInMeta := false
 			for i, index := range dnList {

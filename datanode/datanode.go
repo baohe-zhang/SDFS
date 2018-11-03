@@ -55,34 +55,34 @@ func (dn *dataNode) Handler(conn net.Conn) {
 		fmt.Println(err.Error())
 	}
 
-	if buf[0]&utils.WriteRequestMsg != 0 {
+	if buf[0] == utils.WriteRequestMsg {
 		// Receive write request from client
 		msg := utils.WriteRequest{}
 		utils.Deserialize(buf[:n], &msg)
 
 		dn.fileReader(conn, msg)
 
-	} else if buf[0]&utils.ReadRequestMsg != 0 {
+	} else if buf[0] == utils.ReadRequestMsg {
 		// Receive read request from client
 		msg := utils.ReadRequest{}
 		utils.Deserialize(buf[:n], &msg)
 
 		dn.fileWriter(conn, msg)
-	} else if buf[0]&utils.ReReplicaRequestMsg != 0 {
+	} else if buf[0] == utils.ReReplicaRequestMsg {
 		// Receive re-replica request from master or peer
 		fmt.Println("Receive re-replica request")
 		msg := utils.ReReplicaRequest{}
 		utils.Deserialize(buf[:n], &msg)
 
 		dn.reReplicaStat(conn, msg)
-	} else if buf[0]&utils.ReReplicaResponseMsg != 0 {
+	} else if buf[0] == utils.ReReplicaResponseMsg {
 		// Receive re-replica response from peer
 		fmt.Println("Receive re-replica response")
 		msg := utils.ReReplicaResponse{}
 		utils.Deserialize(buf[:n], &msg)
 
 		dn.reReplicaReader(conn, msg)
-	} else if buf[0]&utils.ReReplicaGetMsg != 0 {
+	} else if buf[0] == utils.ReReplicaGetMsg {
 		// Receive re-replica get from peer
 		fmt.Println("Receive re-replica get")
 		msg := utils.ReReplicaGet{}
