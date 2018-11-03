@@ -149,7 +149,12 @@ func (mn *masterNode) ReReplicaRoutine() {
 			dataNodes := info[0].DataNodes
 			dnList, err := utils.HashReplicaRange(filename, uint32(mn.MemberList.Size()))
 			utils.PrintError(err)
-			rrr := utils.ReReplicaRequest{MsgType: utils.ReReplicaRequestMsg, FilenameHash: utils.HashFilename(filename)}
+			rrr := utils.ReReplicaRequest{
+				MsgType:      utils.ReReplicaRequestMsg,
+				FilenameHash: utils.HashFilename(filename),
+				TimeToLive:   4,
+			}
+			fmt.Println("Filename Hash", utils.Hash2Text(rrr.FilenameHash[:]))
 			nodeIP := " "
 			isInMeta := false
 			for i, index := range dnList {
@@ -172,6 +177,7 @@ func (mn *masterNode) ReReplicaRoutine() {
 			} else {
 				fmt.Println("No applicable replica nodes. Replica failed")
 			}
+			meta.UpdateFileInfo(utils.Hash2Text(rrr.FilenameHash[:]), rrr.DataNodeList[:])
 		}
 		time.Sleep(30 * time.Second)
 	}
