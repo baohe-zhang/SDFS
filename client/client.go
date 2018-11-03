@@ -245,7 +245,7 @@ func storeCommand(masterConn net.Conn) {
 	_, err := masterConn.Write(bin)
 	printErrorExit(err)
 
-	buf := make([]byte, BufferSize)
+	buf := make([]byte, 40)
 	n, err := masterConn.Read(buf)
 	printErrorExit(err)
 
