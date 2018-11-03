@@ -15,7 +15,7 @@ type MemberList struct {
 }
 
 type Member struct {
-	TimeStamp uint64
+	Timestamp uint64
 	IP        uint32
 	State     uint8
 }
@@ -42,7 +42,7 @@ func (ml *MemberList) Less(i, j int) bool {
 	if ml.Members[i].IP > ml.Members[j].IP {
 		return false
 	}
-	return ml.Members[i].TimeStamp < ml.Members[j].TimeStamp
+	return ml.Members[i].Timestamp < ml.Members[j].Timestamp
 }
 
 func (ml *MemberList) Swap(i, j int) {
@@ -71,7 +71,7 @@ func (ml *MemberList) RetrieveByIdx(idx int) (*Member, error) {
 // If insert member exists, return err
 func (ml *MemberList) Insert(m *Member) error {
 	// Check whether insert member exists
-	if ml.Select(m.TimeStamp, m.IP) != -1 {
+	if ml.Select(m.Timestamp, m.IP) != -1 {
 		return errors.New("Member already exists")
 	}
 
@@ -85,7 +85,7 @@ func (ml *MemberList) Insert(m *Member) error {
 	sort.Sort(ml)
 
 	// Log Insert
-	Logger.Info("Insert member (%d, %d)\n", m.TimeStamp, m.IP)
+	Logger.Info("Insert member (%d, %d)\n", m.Timestamp, m.IP)
 
 	// Prolong the shuffle list
 	ml.shuffleList = append(ml.shuffleList, len(ml.shuffleList))
@@ -140,7 +140,7 @@ func (ml *MemberList) Update(ts uint64, ip uint32, state uint8) error {
 
 func (ml *MemberList) Select(ts uint64, ip uint32) int {
 	for idx := 0; idx < ml.size; idx += 1 {
-		if (ml.Members[idx].TimeStamp == ts) && (ml.Members[idx].IP == ip) {
+		if (ml.Members[idx].Timestamp == ts) && (ml.Members[idx].IP == ip) {
 			// Search hit
 			return idx
 		}
@@ -164,7 +164,7 @@ func (ml *MemberList) PrintMemberList() {
 	for idx := 0; idx < ml.size; idx += 1 {
 		m := ml.Members[idx]
 		fmt.Printf("idx: %d, TS: %d, IP: %s, ST: %b\n", idx,
-			m.TimeStamp, int2ip(m.IP).String(), m.State)
+			m.Timestamp, int2ip(m.IP).String(), m.State)
 	}
 	fmt.Printf("------------------------------------------\n")
 }

@@ -44,7 +44,7 @@ func (tc *TtlCache) Get() (*Update, error) {
 	}
 	cur := tc.TtlList[tc.Pointer]
 	// Copy current update
-	update := Update{cur.UpdateID, cur.TTL, cur.UpdateType, cur.MemberTimeStamp, cur.MemberIP, cur.MemberState}
+	update := Update{cur.UpdateID, cur.TTL, cur.UpdateType, cur.MemberTimestamp, cur.MemberIP, cur.MemberState}
 	cur.TTL -= 1
 	if cur.TTL < 1 {
 		Logger.Debug("TTL cache expired %d\n", cur.UpdateID)

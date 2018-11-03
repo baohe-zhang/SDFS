@@ -30,8 +30,8 @@ const (
 	SuspectPeriod      = 1000 * time.Millisecond
 	UpdateDeletePeriod = 15000 * time.Millisecond
 	LeaveDelayPeriod   = 2000 * time.Millisecond
-	TimeToLive   = 3
-	HeaderLength = 4
+	TimeToLive         = 3
+	HeaderLength       = 4
 )
 
 type Header struct {
@@ -44,7 +44,7 @@ type Update struct {
 	UpdateID        uint64
 	TTL             uint8
 	UpdateType      uint8
-	MemberTimeStamp uint64
+	MemberTimestamp uint64
 	MemberIP        uint32
 	MemberState     uint8
 }
@@ -64,7 +64,7 @@ var UpdateCacheList *TtlCache
 var Logger *ssmsLogger
 
 var wg sync.WaitGroup // Block goroutines until user type join
-var mutex sync.Mutex // Mutex used for duplicate update caches write
+var mutex sync.Mutex  // Mutex used for duplicate update caches write
 
 // Convert struct to byte array
 func serialize(data interface{}) []byte {
@@ -128,7 +128,7 @@ func daemon() {
 	wg.Add(1) // Wait until user type join
 
 	go packetListenner() // Packet listening goroutine
-	go periodicPing() // Packet sending goroutine
+	go periodicPing()    // Packet sending goroutine
 
 	commandHandler(cc) // Client goroutine, listen to user's input
 }
@@ -168,7 +168,7 @@ func commandHandler(c chan string) {
 			MyList.PrintMemberList()
 
 		case "id":
-			fmt.Printf("Member (%d, %s)\n", MyMember.TimeStamp, MyIP)
+			fmt.Printf("Member (%d, %s)\n", MyMember.Timestamp, MyIP)
 
 		case "leave":
 			if MyList.Size() < 1 {
@@ -184,7 +184,7 @@ func commandHandler(c chan string) {
 			fmt.Println("# id")
 			fmt.Println("# leave")
 
-		default: 
+		default:
 
 		}
 	}
@@ -201,11 +201,11 @@ func periodicPing() {
 		if MyList.Size() > 0 {
 			member := MyList.Shuffle()
 			// Do not pick itself as the ping target
-			if (member.TimeStamp == MyMember.TimeStamp) && (member.IP == MyMember.IP) {
+			if (member.Timestamp == MyMember.Timestamp) && (member.IP == MyMember.IP) {
 				time.Sleep(PingSendingPeriod)
 				continue
 			}
-			Logger.Info("Member (%d, %d) is selected by shuffling\n", member.TimeStamp, int2ip(member.IP).String())
+			Logger.Info("Member (%d, %d) is selected by shuffling\n", member.Timestamp, int2ip(member.IP).String())
 			// Get update entry from TTL Cache
 			update, flag, err := getUpdate()
 			// if no update there, do pure ping
@@ -230,7 +230,7 @@ func packetListenner() {
 
 	// Listening loop
 	for {
-		packet := make([]byte, 512) // Buffer to store packet
+		packet := make([]byte, 512)               // Buffer to store packet
 		n, addr, err := uconn.ReadFromUDP(packet) // Receive packet
 		printError(err)
 
@@ -285,7 +285,7 @@ func packetHandler(header Header, payload []byte, addr *net.UDPAddr) {
 		}
 
 		if header.Type&MemInitReply != 0 {
-			stop := initTimer.Stop() // Stop init timer 
+			stop := initTimer.Stop() // Stop init timer
 			if stop {
 				Logger.Info("Receive init reply from %s with %d\n", addr.IP.String(), header.Seq)
 			}
@@ -370,7 +370,7 @@ func getUpdate() ([]byte, uint8, error) {
 // Generate a new update and set it in TTL Cache
 func addUpdateToCache(member *Member, updateType uint8) {
 	uid := UpdateCacheList.RandGen.Uint64()
-	update := Update{uid, TimeToLive, updateType, member.TimeStamp, member.IP, member.State}
+	update := Update{uid, TimeToLive, updateType, member.Timestamp, member.IP, member.State}
 	UpdateCacheList.Set(&update)
 	// This daemon is the update producer, add this update to the update duplicate cache
 	isUpdateDuplicate(uid)
@@ -383,22 +383,22 @@ func handleSuspect(payload []byte) {
 	updateID := update.UpdateID
 	if !isUpdateDuplicate(updateID) {
 		// If someone suspect me, tell them I am alvie
-		if MyMember.TimeStamp == update.MemberTimeStamp && MyMember.IP == update.MemberIP {
+		if MyMember.Timestamp == update.MemberTimestamp && MyMember.IP == update.MemberIP {
 			addUpdateToCache(MyMember, MemUpdateResume)
 			return
 		}
 		// Someone else is being suspected
-		MyList.Update(update.MemberTimeStamp, update.MemberIP, update.MemberState)
+		MyList.Update(update.MemberTimestamp, update.MemberIP, update.MemberState)
 		UpdateCacheList.Set(&update)
 		timer := time.NewTimer(SuspectPeriod)
-		FailureTimerMap[[2]uint64{update.MemberTimeStamp, uint64(update.MemberIP)}] = timer
+		FailureTimerMap[[2]uint64{update.MemberTimestamp, uint64(update.MemberIP)}] = timer
 		go func() {
 			<-timer.C
-			err := MyList.Delete(update.MemberTimeStamp, update.MemberIP)
+			err := MyList.Delete(update.MemberTimestamp, update.MemberIP)
 			if err == nil {
-				Logger.Info("[Failure Detected](%s, %d) Failed, detected by suspect update\n", int2ip(update.MemberIP).String(), update.MemberTimeStamp)
+				Logger.Info("[Failure Detected](%s, %d) Failed, detected by suspect update\n", int2ip(update.MemberIP).String(), update.MemberTimestamp)
 			}
-			delete(FailureTimerMap, [2]uint64{update.MemberTimeStamp, uint64(update.MemberIP)})
+			delete(FailureTimerMap, [2]uint64{update.MemberTimestamp, uint64(update.MemberIP)})
 		}()
 	}
 }
@@ -409,15 +409,15 @@ func handleResume(payload []byte) {
 
 	updateID := update.UpdateID
 	if !isUpdateDuplicate(updateID) {
-		timer, exist := FailureTimerMap[[2]uint64{update.MemberTimeStamp, uint64(update.MemberIP)}]
+		timer, exist := FailureTimerMap[[2]uint64{update.MemberTimestamp, uint64(update.MemberIP)}]
 		if exist {
 			timer.Stop()
-			delete(FailureTimerMap, [2]uint64{update.MemberTimeStamp, uint64(update.MemberIP)})
+			delete(FailureTimerMap, [2]uint64{update.MemberTimestamp, uint64(update.MemberIP)})
 		}
-		err := MyList.Update(update.MemberTimeStamp, update.MemberIP, update.MemberState)
+		err := MyList.Update(update.MemberTimestamp, update.MemberIP, update.MemberState)
 		// If the resume target is not in the list, insert it to the list
 		if err != nil {
-			MyList.Insert(&Member{update.MemberTimeStamp, update.MemberIP, update.MemberState})
+			MyList.Insert(&Member{update.MemberTimestamp, update.MemberIP, update.MemberState})
 		}
 		UpdateCacheList.Set(&update)
 	}
@@ -429,7 +429,7 @@ func handleLeave(payload []byte) {
 
 	updateID := update.UpdateID
 	if !isUpdateDuplicate(updateID) {
-		MyList.Delete(update.MemberTimeStamp, update.MemberIP)
+		MyList.Delete(update.MemberTimestamp, update.MemberIP)
 		UpdateCacheList.Set(&update)
 	}
 }
@@ -440,7 +440,7 @@ func handleJoin(payload []byte) {
 
 	updateID := update.UpdateID
 	if !isUpdateDuplicate(updateID) {
-		MyList.Insert(&Member{update.MemberTimeStamp, update.MemberIP, update.MemberState})
+		MyList.Insert(&Member{update.MemberTimestamp, update.MemberIP, update.MemberState})
 		UpdateCacheList.Set(&update)
 	}
 }
@@ -470,7 +470,7 @@ func initReply(addr string, seq uint16, payload []byte) {
 		member, _ := MyList.RetrieveByIdx(i)
 		binary.Write(&memBuffer, binary.BigEndian, member)
 		binBuffer.Write(memBuffer.Bytes()) // Append existing member's bytes into binBuffer
-		memBuffer.Reset() // Clear buffer
+		memBuffer.Reset()                  // Clear buffer
 	}
 
 	// Send pigggback Init Reply
@@ -492,20 +492,20 @@ func initRequest(member *Member) {
 
 func initiateLeave() {
 	uid := UpdateCacheList.RandGen.Uint64()
-	update := Update{uid, TimeToLive, MemUpdateLeave, MyMember.TimeStamp, MyMember.IP, MyMember.State}
+	update := Update{uid, TimeToLive, MemUpdateLeave, MyMember.Timestamp, MyMember.IP, MyMember.State}
 	// Clear current update cache list and add delete update to the cache
 	UpdateCacheList = NewTtlCache()
 	UpdateCacheList.Set(&update)
 	isUpdateDuplicate(uid)
-	Logger.Info("Member (%d, %s) leaves", MyMember.TimeStamp, MyIP)
+	Logger.Info("Member (%d, %s) leaves", MyMember.Timestamp, MyIP)
 	time.Sleep(LeaveDelayPeriod)
 	Initilize()
 }
 
 func ackWithPayload(addr string, seq uint16, payload []byte, flag uint8) {
 	header := Header{
-		Type: Ack | flag,
-		Seq: seq + 1,
+		Type:     Ack | flag,
+		Seq:      seq + 1,
 		Reserved: 0,
 	}
 
@@ -532,8 +532,8 @@ func pingWithPayload(member *Member, payload []byte, flag uint8) {
 	addr := int2ip(member.IP).String() + MembershipPort
 
 	header := Header{
-		Type: Ping | flag,
-		Seq: uint16(seq),
+		Type:     Ping | flag,
+		Seq:      uint16(seq),
 		Reserved: 0,
 	}
 
@@ -554,21 +554,21 @@ func pingWithPayload(member *Member, payload []byte, flag uint8) {
 	go func() {
 		<-suspectTimer.C
 		Logger.Info("Ping (%s, %d) timeout\n", addr, seq)
-		err := MyList.Update(member.TimeStamp, member.IP, StateSuspect)
+		err := MyList.Update(member.Timestamp, member.IP, StateSuspect)
 		if err == nil {
 			addUpdateToCache(member, MemUpdateSuspect)
 		}
 		delete(SuspectTimerMap, uint16(seq))
 		// Handle local suspect timeout
 		failureTimer := time.NewTimer(SuspectPeriod)
-		FailureTimerMap[[2]uint64{member.TimeStamp, uint64(member.IP)}] = failureTimer
+		FailureTimerMap[[2]uint64{member.Timestamp, uint64(member.IP)}] = failureTimer
 		go func() {
 			<-failureTimer.C
-			err := MyList.Delete(member.TimeStamp, member.IP)
+			err := MyList.Delete(member.Timestamp, member.IP)
 			if err == nil {
-				Logger.Info("[Failure Detected](%s, %d) Failed, detected by self\n", int2ip(member.IP).String(), member.TimeStamp)
+				Logger.Info("[Failure Detected](%s, %d) Failed, detected by self\n", int2ip(member.IP).String(), member.Timestamp)
 			}
-			delete(FailureTimerMap, [2]uint64{member.TimeStamp, uint64(member.IP)})
+			delete(FailureTimerMap, [2]uint64{member.Timestamp, uint64(member.IP)})
 		}()
 	}()
 }
