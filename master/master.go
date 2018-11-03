@@ -179,7 +179,7 @@ func (mn *masterNode) ReReplicaRoutine() {
 			mn.ReReplicaRequest(rrr, utils.StringIP(rrr.DataNodeList[0].IP)+":"+utils.StringPort(mn.DNPort))
 			meta.UpdateFileInfo(utils.Hash2Text(rrr.FilenameHash[:]), rrr.DataNodeList[:])
 		}
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
 	}
 }
 
