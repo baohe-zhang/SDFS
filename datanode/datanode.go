@@ -399,7 +399,7 @@ func (dn *dataNode) getNexthopID(nodeList []utils.NodeID) (utils.NodeID, error) 
 // Return the first non-zero nodeID's index
 func (dn *dataNode) getNexthopIDCircle(nodeList []utils.NodeID) (utils.NodeID, error) {
 	for k, v := range nodeList {
-		if v == dn.NodeID && k < len(nodeList)-1 &&
+		if v == dn.NodeID && k < len(nodeList) &&
 			nodeList[(k+1)%len(nodeList)].IP != 0 && nodeList[(k+1)%len(nodeList)].Timestamp != 0 {
 			return nodeList[(k+1)%len(nodeList)], nil
 		}
