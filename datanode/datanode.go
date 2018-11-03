@@ -70,18 +70,21 @@ func (dn *dataNode) Handler(conn net.Conn) {
 		dn.fileWriter(conn, msg)
 	} else if buf[0]&utils.ReReplicaRequestMsg != 0 {
 		// Receive re-replica request from master or peer
+		fmt.Println("Receive re-replica request")
 		msg := utils.ReReplicaRequest{}
 		utils.Deserialize(buf[:n], &msg)
 
 		dn.reReplicaStat(conn, msg)
 	} else if buf[0]&utils.ReReplicaResponseMsg != 0 {
 		// Receive re-replica response from peer
+		fmt.Println("Receive re-replica response")
 		msg := utils.ReReplicaResponse{}
 		utils.Deserialize(buf[:n], &msg)
 
 		dn.reReplicaReader(conn, msg)
 	} else if buf[0]&utils.ReReplicaGetMsg != 0 {
 		// Receive re-replica get from peer
+		fmt.Println("Receive re-replica get")
 		msg := utils.ReReplicaGet{}
 		utils.Deserialize(buf[:n], &msg)
 
@@ -93,6 +96,7 @@ func (dn *dataNode) Handler(conn net.Conn) {
 // Handle Re-Replica Request message from master or peer datanode
 func (dn *dataNode) reReplicaStat(conn net.Conn, rrrMsg utils.ReReplicaRequest) {
 	hashFilename := utils.Hash2Text(rrrMsg.FilenameHash[:])
+	fmt.Println("ReplicaStat", hashFilename)
 	_, ok := meta.FileInfo(hashFilename)
 	dn.dialDataNodeReReplica(rrrMsg)
 	meta.UpdateFileInfo(hashFilename, rrrMsg.DataNodeList[:])
@@ -365,7 +369,7 @@ func (dn *dataNode) dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 
 // Dial DataNode with ReReplicaRequest transfer
 func (dn *dataNode) dialDataNodeReReplica(rrr utils.ReReplicaRequest) {
-	nodeID, err := dn.getNexthopID(rrr.DataNodeList[:])
+	nodeID, err := dn.getNexthopIDCircle(rrr.DataNodeList[:])
 	if err != nil {
 		fmt.Println("Get Node ID failed")
 		return
@@ -387,6 +391,17 @@ func (dn *dataNode) getNexthopID(nodeList []utils.NodeID) (utils.NodeID, error) 
 		if v == dn.NodeID && k < len(nodeList)-1 &&
 			nodeList[k+1].IP != 0 && nodeList[k+1].Timestamp != 0 {
 			return nodeList[k+1], nil
+		}
+	}
+	return utils.NodeID{}, errors.New("Nexthop doesn't exists")
+}
+
+// Return the first non-zero nodeID's index
+func (dn *dataNode) getNexthopIDCircle(nodeList []utils.NodeID) (utils.NodeID, error) {
+	for k, v := range nodeList {
+		if v == dn.NodeID && k < len(nodeList)-1 &&
+			nodeList[(k+1)%len(nodeList)].IP != 0 && nodeList[(k+1)%len(nodeList)].Timestamp != 0 {
+			return nodeList[(k+1)%len(nodeList)], nil
 		}
 	}
 	return utils.NodeID{}, errors.New("Nexthop doesn't exists")
