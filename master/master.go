@@ -176,6 +176,7 @@ func (mn *masterNode) ReReplicaRoutine() {
 			} else {
 				fmt.Println("No applicable replica nodes. Replica failed")
 			}
+			meta.UpdateFileInfo(utils.Hash2Text(rrr.FilenameHash[:]), rrr.DataNodeList[:])
 		}
 		time.Sleep(30 * time.Second)
 	}
