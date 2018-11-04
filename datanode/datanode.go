@@ -368,13 +368,13 @@ func (dn *dataNode) dialDataNodeReReplica(rrr utils.ReReplicaRequest) {
 		return
 	}
 
-	nodeID, err := dn.getNexthopIDCircle(rrr.DataNodeList[:])
+	nid, err := dn.getNexthopID(rrr.DataNodeList[:])
 	if err != nil {
 		fmt.Println("Get Node ID failed")
 		return
 	}
 
-	conn, err := net.Dial("tcp", utils.StringIP(nodeID.IP)+":"+dn.NodePort)
+	conn, err := net.Dial("tcp", utils.StringIP(nid.IP)+":"+dn.NodePort)
 	if err != nil {
 		utils.PrintError(err)
 		return
