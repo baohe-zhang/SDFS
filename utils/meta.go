@@ -58,10 +58,12 @@ func (meta Meta) FileInfoWithTs(filename string, ts uint64) (Info, bool) {
 	if ok {
 		for _, info := range infos {
 			if info.Timestamp == ts {
+				fmt.Println("Successful return", info, ts)
 				return info, true
 			}
 		}
 	}
+	fmt.Println("UnSuccessful return", ts)
 	return Info{}, false
 }
 
