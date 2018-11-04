@@ -240,18 +240,24 @@ func (mn *masterNode) pickReceivers(fileHolders []utils.NodeID, num int) []utils
 	// All nodes excluding file holders are candidates
 	for i := 0; i < mn.MemberList.Size(); i++ {
 		member := mn.MemberList.Members[i]
+		isFileHolder := false
 		for _, fileHolder := range fileHolders {
 			if member.Timestamp == fileHolder.Timestamp && member.IP == fileHolder.IP {
+				isFileHolder = true
 				break
-			} else {
-				candidates = append(candidates, utils.NodeID{member.Timestamp, member.IP})
 			}
+		}
+		if isFileHolder == false {
+			candidates = append(candidates, utils.NodeID{member.Timestamp, member.IP})
 		}
 	}
 
 	fmt.Println(candidates)
 
 	if len(candidates) < num {
+		for i := len(candidates); i < num; i++ {
+			candidates = append(candidates, utils.NodeID{0, 0})
+		}
 		return candidates
 	}
 
