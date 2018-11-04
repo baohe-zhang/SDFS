@@ -109,8 +109,8 @@ func (mn *masterNode) HandleGetVersionsRequest(gvrMsg utils.GetVersionsRequest, 
 		numVersions = 5
 	}
 
-	if numVersions > len(infos) {
-		numVersions = len(infos)
+	if numVersions > uint8(len(infos)) {
+		numVersions = uint8(len(infos))
 	}
 
 	for _, info := range infos[:numVersions] {
