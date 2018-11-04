@@ -97,6 +97,19 @@ func (meta Meta) UpdateFileInfo(filename string, dataNodeList []NodeID) {
 	}
 }
 
+func (meta Meta) UpdateFileInfoWithTs(filename string, dataNodeList []NodeID, ts uint64) {
+	infos, ok := meta[filename]
+	if ok {
+		for _, info := range infos {
+			if info.Timestamp == ts {
+				for j, _ := range info.DataNodes {
+					info.DataNodes[j] = dataNodeList[j]
+				}
+			}
+		}
+	}
+}
+
 func (meta Meta) RmFileInfo(filename string) bool {
 	_, ok := meta[filename]
 	if ok {

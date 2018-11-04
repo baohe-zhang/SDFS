@@ -83,6 +83,7 @@ func (dn *dataNode) reReplicaStat(conn net.Conn, rrrMsg utils.ReReplicaRequest) 
 	hashFilename := utils.Hash2Text(rrrMsg.FilenameHash[:])
 	fmt.Println("ReplicaStat", hashFilename)
 	_, ok := meta.FileInfoWithTs(hashFilename, rrrMsg.Timestamp)
+	meta.UpdateFileInfoWithTs(hashFilename, rrrMsg.DataNodeList[:], rrrMsg.Timestamp)
 
 	rrg := utils.ReReplicaGet{MsgType: utils.ReReplicaGetMsg, FilenameHash: rrrMsg.FilenameHash, Timestamp: rrrMsg.Timestamp}
 	if ok {
@@ -113,7 +114,6 @@ func (dn *dataNode) reReplicaStat(conn net.Conn, rrrMsg utils.ReReplicaRequest) 
 	dn.reReplicaReader(conn, response)
 
 	dn.dialDataNodeReReplica(rrrMsg)
-	meta.UpdateFileInfo(hashFilename, rrrMsg.DataNodeList[:])
 }
 
 func (dn *dataNode) reReplicaReader(conn net.Conn, rrrMsg utils.ReReplicaResponse) {
@@ -364,6 +364,7 @@ func (dn *dataNode) dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 func (dn *dataNode) dialDataNodeReReplica(rrr utils.ReReplicaRequest) {
 	rrr.TimeToLive -= 1
 	if rrr.TimeToLive == 0 {
+		fmt.Println("Replica TTL expired")
 		return
 	}
 
