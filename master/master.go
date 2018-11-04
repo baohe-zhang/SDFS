@@ -94,9 +94,6 @@ func (mn *masterNode) HandleGetVersionsRequest(gvrMsg utils.GetVersionsRequest, 
 	filename := utils.ParseFilename(gvrMsg.Filename[:])
 	fmt.Println("Get version filename ", filename)
 	numVersions := gvrMsg.VersionNum
-	if numVersions > 5 {
-		numVersions = 5
-	}
 
 	filenameHash := utils.HashFilename(filename)
 	infos, ok := meta.FileInfos(utils.Hash2Text(filenameHash[:]))
@@ -106,6 +103,14 @@ func (mn *masterNode) HandleGetVersionsRequest(gvrMsg utils.GetVersionsRequest, 
 		bin := utils.Serialize(gvr)
 		conn.Write(bin)
 		return
+	}
+
+	if numVersions > 5 {
+		numVersions = 5
+	}
+
+	if numVersions > len(infos) {
+		numVersions = len(infos)
 	}
 
 	for _, info := range infos[:numVersions] {

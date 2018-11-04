@@ -56,6 +56,7 @@ func (dn *dataNode) Handler(conn net.Conn) {
 
 	if buf[0] == utils.WriteRequestMsg {
 		// Receive write request from client
+		fmt.Println("Receive write request")
 		msg := utils.WriteRequest{}
 		utils.Deserialize(buf[:n], &msg)
 
@@ -63,6 +64,7 @@ func (dn *dataNode) Handler(conn net.Conn) {
 
 	} else if buf[0] == utils.ReadRequestMsg {
 		// Receive read request from client
+		fmt.Println("Receive read request")
 		msg := utils.ReadRequest{}
 		utils.Deserialize(buf[:n], &msg)
 
@@ -76,6 +78,7 @@ func (dn *dataNode) Handler(conn net.Conn) {
 		dn.reReplicaStat(conn, msg)
 	} else if buf[0] == utils.ReadVersionRequestMsg {
 		// Receive read request from client
+		fmt.Println("Receive read version request")
 		msg := utils.ReadVersionRequest{}
 		utils.Deserialize(buf[:n], &msg)
 

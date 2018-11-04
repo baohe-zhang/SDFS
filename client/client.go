@@ -203,8 +203,9 @@ func fileVersionGet(gvr utils.GetVersionsResponse, localfile string) {
 	file, err := os.Create(localfile + fmt.Sprintf("-v%d", gvr.Timestamp))
 	utils.PrintError(err)
 
-	rvr := utils.ReadVersionRequest{MsgType: utils.ReadRequestMsg}
+	rvr := utils.ReadVersionRequest{MsgType: utils.ReadVersionRequestMsg}
 	rvr.FilenameHash = gvr.FilenameHash
+	rvr.Timestamp = gvr.Timestamp
 
 	bin := utils.Serialize(rvr)
 	_, err = conn.Write(bin)
