@@ -465,7 +465,7 @@ func initReply(addr string, seq uint16, payload []byte) {
 	var newMember Member
 	deserialize(payload, &newMember)
 	MyList.Insert(&newMember)
-	addUpdateToCache(&newMember, MemUpdateJoin, TimeToLive+2) // Update this new member's join
+	addUpdateToCache(&newMember, MemUpdateJoin, TimeToLive+4) // Update this new member's join
 
 	// Put the entire memberlist to the Init Reply's payload
 	var memBuffer bytes.Buffer // Temp buf to store member's binary value
