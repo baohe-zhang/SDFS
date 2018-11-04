@@ -328,6 +328,7 @@ func (dn *dataNode) fileVersionWriter(conn net.Conn, rvr utils.ReadVersionReques
 	// Retrieve local filename from read request and meta data
 	filename := utils.Hash2Text(rvr.FilenameHash[:])
 	info, ok := meta.FileInfoWithTs(filename, rvr.Timestamp)
+	fmt.Println("Fileinfo", info)
 	if ok == false {
 		conn.Write([]byte(" "))
 		fmt.Println("Local file requested not found")
