@@ -26,7 +26,7 @@ const (
 	StateIntro         = 0x01 << 3
 	InitTimeoutPeriod  = 2000 * time.Millisecond
 	PingTimeoutPeriod  = 2000 * time.Millisecond
-	PingSendingPeriod  = 250 * time.Millisecond
+	PingSendingPeriod  = 125 * time.Millisecond
 	SuspectPeriod      = 2000 * time.Millisecond
 	UpdateDeletePeriod = 15000 * time.Millisecond
 	LeaveDelayPeriod   = 2000 * time.Millisecond
