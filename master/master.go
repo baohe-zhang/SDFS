@@ -109,7 +109,7 @@ func (mn *masterNode) HandleGetVersionsRequest(gvrMsg utils.GetVersionsRequest, 
 	}
 
 	for _, info := range infos[:numVersions] {
-		gvr := utils.GetVersionsResponse{MsgType: utils.GetVersionsResponseMsg}
+		gvr := utils.GetVersionsResponse{MsgType: utils.GetVersionsResponseMsg, VersionNum: numVersions}
 		gvr.FilenameHash = utils.HashFilename(filename)
 		gvr.Filesize = info.Filesize
 		nodeIPs := [utils.NumReplica]uint32{}
