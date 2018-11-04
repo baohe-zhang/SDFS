@@ -329,16 +329,16 @@ func (dn *dataNode) fileVersionWriter(conn net.Conn, rvr utils.ReadVersionReques
 	filename := utils.Hash2Text(rvr.FilenameHash[:])
 	info, ok := meta.FileInfoWithTs(filename, rvr.Timestamp)
 	fmt.Println("Fileinfo", info)
+
 	if ok == false {
 		conn.Write([]byte(" "))
 		fmt.Println("Local file requested not found")
 		return
 	}
-	timestamp := fmt.Sprintf("%d", info.Timestamp)
-	filename = filename + ":" + timestamp
+	timestamp := fmt.Sprintf("%d", rvr.Timestamp)
 
 	// Send file to client
-	file, err := os.OpenFile(filename, os.O_RDONLY, 0755)
+	file, err := os.OpenFile(filename+":"+timestamp, os.O_RDONLY, 0755)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
