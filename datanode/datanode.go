@@ -84,14 +84,14 @@ func (dn *dataNode) reReplicaStat(conn net.Conn, rrrMsg utils.ReReplicaRequest) 
 	fmt.Println("ReplicaStat", hashFilename)
 	_, ok := meta.FileInfoWithTs(hashFilename, rrrMsg.Timestamp)
 
-	rrr := utils.ReReplicaGet{MsgType: utils.ReReplicaGetMsg, FilenameHash: rrrMsg.FilenameHash}
+	rrg := utils.ReReplicaGet{MsgType: utils.ReReplicaGetMsg, FilenameHash: rrrMsg.FilenameHash, Timestamp: rrrMsg.Timestamp}
 	if ok {
-		rrr.GetNeed = false
+		rrg.GetNeed = false
 	} else {
-		rrr.GetNeed = true
+		rrg.GetNeed = true
 	}
 
-	bin := utils.Serialize(rrr)
+	bin := utils.Serialize(rrg)
 	_, err := conn.Write(bin)
 	utils.PrintError(err)
 	if ok {
@@ -100,7 +100,7 @@ func (dn *dataNode) reReplicaStat(conn net.Conn, rrrMsg utils.ReReplicaRequest) 
 		return
 	}
 
-	buf := make([]byte, BufferSize)
+	buf := make([]byte, 97)
 	n, err := conn.Read(buf)
 	utils.PrintError(err)
 
@@ -123,7 +123,7 @@ func (dn *dataNode) reReplicaReader(conn net.Conn, rrrMsg utils.ReReplicaRespons
 	timestamp := fmt.Sprintf("%d", rrrMsg.Timestamp)
 	filename := hashFilename + ":" + timestamp
 
-	fmt.Println("filename: ", filename)
+	fmt.Println("Replica filename: ", filename)
 
 	// Create file descriptor
 	file, err := os.Create(filename)
@@ -391,8 +391,9 @@ func (dn *dataNode) dialDataNodeReReplica(rrr utils.ReReplicaRequest) {
 
 	// Send re-replica request to the next hop
 	conn.Write(utils.Serialize(rrr))
+	fmt.Println("Dial the next replica node")
 
-	buf := make([]byte, BufferSize)
+	buf := make([]byte, 42)
 	n, err := conn.Read(buf)
 	utils.PrintError(err)
 
