@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"simpledfs/utils"
+	"strconv"
 	"time"
 )
 
@@ -178,6 +179,57 @@ func getCommand(masterConn net.Conn, sdfsfile string, localfile string) {
 	fileGet(response, localfile)
 }
 
+func fileVersionGet(gvr utils.GetVersionsResponse, localfile string) {
+	var conn net.Conn
+	hasConn := false
+	for index, ip := range gvr.DataNodeIPList {
+		var err error
+		conn, err = net.Dial("tcp", utils.StringIP(ip)+":"+fmt.Sprintf("%d", gvr.DataNodePortList[index]))
+		utils.PrintError(err)
+		if err == nil {
+			hasConn = true
+			fmt.Println("Dial ", utils.StringIP(ip), " successful")
+			break
+		} else {
+			continue
+		}
+		defer conn.Close()
+	}
+	if hasConn == false {
+		fmt.Println("Cannot dial all datanodes")
+		return
+	}
+
+	file, err := os.Create(localfile + fmt.Sprintf("-v%d", gvr.Timestamp))
+	utils.PrintError(err)
+
+	rvr := utils.ReadVersionRequest{MsgType: utils.ReadRequestMsg}
+	rvr.FilenameHash = gvr.FilenameHash
+
+	bin := utils.Serialize(rvr)
+	_, err = conn.Write(bin)
+	fmt.Println("Sent ReadVersionRequest")
+	utils.PrintError(err)
+
+	buf := make([]byte, BufferSize)
+	var receivedBytes uint64
+
+	for {
+		n, err := conn.Read(buf)
+		file.Write(buf[:n])
+		receivedBytes += uint64(n)
+		if err == io.EOF {
+			fmt.Printf("Receive versioned file with %d bytes\n", receivedBytes)
+			break
+		}
+
+	}
+
+	if gvr.Filesize != receivedBytes {
+		fmt.Println("Unmatched two files")
+	}
+}
+
 // Delete a SDFSFile command execution for simpleDFS client
 func deleteCommand(masterConn net.Conn, sdfsfile string) {
 	drPacket := utils.DeleteRequest{MsgType: utils.DeleteRequestMsg}
@@ -273,6 +325,44 @@ func storeCommand(masterConn net.Conn) {
 	return
 }
 
+// Get number of versions of SDFSFile stored in simpleDFS
+func getVersionsCommand(masterConn net.Conn, numVersion int64, sdfsfile string, localfile string) {
+	gvrPacket := utils.GetVersionsRequest{MsgType: utils.GetVersionsRequestMsg, VersionNum: uint8(numVersion)}
+	copy(gvrPacket.Filename[:], sdfsfile)
+	bin := utils.Serialize(gvrPacket)
+	_, err := masterConn.Write(bin)
+	printErrorExit(err)
+
+	versionNum := int64(-1)
+	for i := int64(0); i < numVersion; i++ {
+		if versionNum <= i && versionNum != -1 {
+			break
+		}
+
+		buf := make([]byte, 74)
+		n, err := masterConn.Read(buf)
+		printErrorExit(err)
+
+		response := utils.GetVersionsResponse{}
+		utils.Deserialize(buf[:n], &response)
+		if response.MsgType != utils.GetVersionsResponseMsg {
+			fmt.Println("Unexpected message from MasterNode")
+			return
+		}
+
+		if response.VersionNum == 0 {
+			fmt.Println("There is no any files")
+			return
+		}
+
+		versionNum = int64(response.VersionNum)
+
+		fileVersionGet(response, localfile)
+	}
+
+	return
+}
+
 func main() {
 	// If no command line arguments, return
 	if len(os.Args) <= 1 {
@@ -343,6 +433,15 @@ func main() {
 			usage()
 		}
 		fmt.Println(args[1:])
+		sdfsfile := args[1]
+		num := args[2]
+		numInt, err := strconv.ParseInt(num, 10, 32)
+		if err != nil {
+			utils.PrintError(err)
+			return
+		}
+		localfile := args[3]
+		getVersionsCommand(masterConn, numInt, sdfsfile, localfile)
 	default:
 		usage()
 	}

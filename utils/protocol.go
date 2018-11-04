@@ -3,24 +3,27 @@ package utils
 import ()
 
 const (
-	NumReplica           = 4
-	PutRequestMsg        = 1
-	PutResponseMsg       = 2
-	PutConfirmMsg        = 3
-	WriteRequestMsg      = 4
-	WriteConfirmMsg      = 5
-	GetRequestMsg        = 6
-	GetResponseMsg       = 7
-	ReadRequestMsg       = 8
-	DeleteRequestMsg     = 9
-	DeleteResponseMsg    = 10
-	ListRequestMsg       = 11
-	ListResponseMsg      = 12
-	StoreRequestMsg      = 13
-	StoreResponseMsg     = 14
-	ReReplicaRequestMsg  = 15
-	ReReplicaResponseMsg = 16
-	ReReplicaGetMsg      = 17
+	NumReplica             = 4
+	PutRequestMsg          = 1
+	PutResponseMsg         = 2
+	PutConfirmMsg          = 3
+	WriteRequestMsg        = 4
+	WriteConfirmMsg        = 5
+	GetRequestMsg          = 6
+	GetResponseMsg         = 7
+	ReadRequestMsg         = 8
+	DeleteRequestMsg       = 9
+	DeleteResponseMsg      = 10
+	ListRequestMsg         = 11
+	ListResponseMsg        = 12
+	StoreRequestMsg        = 13
+	StoreResponseMsg       = 14
+	ReReplicaRequestMsg    = 15
+	ReReplicaResponseMsg   = 16
+	ReReplicaGetMsg        = 17
+	GetVersionsRequestMsg  = 18
+	GetVersionsResponseMsg = 19
+	ReadVersionRequestMsg  = 20
 )
 
 type PutRequest struct {
@@ -103,6 +106,28 @@ type StoreRequest struct {
 type StoreResponse struct {
 	MsgType  uint8
 	FilesNum uint32
+}
+
+type GetVersionsRequest struct {
+	MsgType    uint8
+	VersionNum uint8
+	Filename   [128]byte
+}
+
+type GetVersionsResponse struct {
+	MsgType          uint8
+	VersionNum       uint8
+	FilenameHash     [32]byte
+	Timestamp        uint64
+	Filesize         uint64
+	DataNodeIPList   [NumReplica]uint32
+	DataNodePortList [NumReplica]uint16
+}
+
+type ReadVersionRequest struct {
+	MsgType      uint8
+	FilenameHash [32]byte
+	Timestamp    uint64
 }
 
 type ReReplicaRequest struct {

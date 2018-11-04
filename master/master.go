@@ -90,6 +90,43 @@ func (mn *masterNode) HandleGetRequest(grMsg utils.GetRequest, conn net.Conn) {
 	return
 }
 
+func (mn *masterNode) HandleGetVersionsRequest(gvrMsg utils.GetVersionsRequest, conn net.Conn) {
+	filename := utils.ParseFilename(gvrMsg.Filename[:])
+	fmt.Println("Get version filename ", filename)
+	numVersions := gvrMsg.VersionNum
+	if numVersions > 5 {
+		numVersions = 5
+	}
+
+	filenameHash := utils.HashFilename(filename)
+	infos, ok := meta.FileInfos(utils.Hash2Text(filenameHash[:]))
+	if ok == false {
+		gvr := utils.GetVersionsResponse{MsgType: utils.GetVersionsResponseMsg}
+		gvr.VersionNum = 0
+		bin := utils.Serialize(gvr)
+		conn.Write(bin)
+		return
+	}
+
+	for _, info := range infos[:numVersions] {
+		gvr := utils.GetVersionsResponse{MsgType: utils.GetVersionsResponseMsg}
+		gvr.FilenameHash = utils.HashFilename(filename)
+		gvr.Filesize = info.Filesize
+		nodeIPs := [utils.NumReplica]uint32{}
+		nodePorts := [utils.NumReplica]uint16{}
+		for k, v := range info.DataNodes {
+			nodeIPs[k] = v.IP
+			nodePorts[k] = mn.DNPort
+		}
+		gvr.DataNodeIPList = nodeIPs
+		gvr.DataNodePortList = nodePorts
+
+		bin := utils.Serialize(gvr)
+		conn.Write(bin)
+	}
+
+}
+
 func (mn *masterNode) HandleDeleteRequest(drMsg utils.DeleteRequest, conn net.Conn) {
 	filename := utils.ParseFilename(drMsg.Filename[:])
 	fmt.Println("filename ", filename)
@@ -228,6 +265,10 @@ func (mn *masterNode) Handle(conn net.Conn) {
 		sr := utils.StoreRequest{}
 		utils.Deserialize(buf[:n], &sr)
 		mn.HandleStoreRequest(sr, conn)
+	case utils.GetVersionsRequestMsg:
+		gvr := utils.GetVersionsRequest{}
+		utils.Deserialize(buf[:n], &gvr)
+		mn.HandleGetVersionsRequest(gvr, conn)
 	default:
 		fmt.Println("Unrecognized packet")
 	}

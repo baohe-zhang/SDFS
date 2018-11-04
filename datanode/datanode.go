@@ -74,6 +74,12 @@ func (dn *dataNode) Handler(conn net.Conn) {
 		utils.Deserialize(buf[:n], &msg)
 
 		dn.reReplicaStat(conn, msg)
+	} else if buf[0] == utils.ReadVersionRequestMsg {
+		// Receive read request from client
+		msg := utils.ReadVersionRequest{}
+		utils.Deserialize(buf[:n], &msg)
+
+		dn.fileVersionWriter(conn, msg)
 	}
 
 }
@@ -273,6 +279,55 @@ func (dn *dataNode) fileWriter(conn net.Conn, rr utils.ReadRequest) {
 	// Retrieve local filename from read request and meta data
 	filename := utils.Hash2Text(rr.FilenameHash[:])
 	info, ok := meta.FileInfo(filename)
+	if ok == false {
+		conn.Write([]byte(" "))
+		fmt.Println("Local file requested not found")
+		return
+	}
+	timestamp := fmt.Sprintf("%d", info.Timestamp)
+	filename = filename + ":" + timestamp
+
+	// Send file to client
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0755)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	defer file.Close()
+
+	// Block until it receives OK
+	/*buf := make([]byte, BufferSize)*/
+	//n, _ := conn.Read(buf)
+	//for n > 0 {
+	//if string(buf[:n]) == "OK" {
+	//break
+	//} else {
+	//buf = make([]byte, BufferSize)
+	//n, _ = conn.Read(buf)
+	//}
+	/*}*/
+
+	//fmt.Println("client ready to receive file")
+
+	buf := make([]byte, BufferSize)
+
+	for {
+		n, err := file.Read(buf)
+		conn.Write(buf[:n])
+		if err == io.EOF {
+			fmt.Printf("Send file %s finish\n", filename)
+			break
+		}
+	}
+
+}
+
+// Send local file with certain version to client
+func (dn *dataNode) fileVersionWriter(conn net.Conn, rvr utils.ReadVersionRequest) {
+	defer conn.Close()
+
+	// Retrieve local filename from read request and meta data
+	filename := utils.Hash2Text(rvr.FilenameHash[:])
+	info, ok := meta.FileInfoWithTs(filename, rvr.Timestamp)
 	if ok == false {
 		conn.Write([]byte(" "))
 		fmt.Println("Local file requested not found")
