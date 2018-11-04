@@ -25,9 +25,9 @@ const (
 	StateMonit         = 0x01 << 2
 	StateIntro         = 0x01 << 3
 	InitTimeoutPeriod  = 2000 * time.Millisecond
-	PingTimeoutPeriod  = 3000 * time.Millisecond
-	PingSendingPeriod  = 250 * time.Millisecond
-	SuspectPeriod      = 4000 * time.Millisecond
+	PingTimeoutPeriod  = 2000 * time.Millisecond
+	PingSendingPeriod  = 100 * time.Millisecond
+	SuspectPeriod      = 2000 * time.Millisecond
 	UpdateDeletePeriod = 15000 * time.Millisecond
 	LeaveDelayPeriod   = 2000 * time.Millisecond
 	TimeToLive         = 4
@@ -50,7 +50,7 @@ type Update struct {
 }
 
 var initTimer *time.Timer
-var SuspectTimerMap map[uint16]*time.Timer
+var SuspectTimerMap map[uint32]*time.Timer
 var FailureTimerMap map[[2]uint64]*time.Timer
 var MyMember *Member
 var MyList *MemberList
@@ -277,11 +277,11 @@ func packetHandler(header Header, payload []byte, addr *net.UDPAddr) {
 
 	} else if header.Type&Ack != 0 {
 
-		timer, exist := SuspectTimerMap[header.Seq-1] // Receive Ack, stop ping timer
+		timer, exist := SuspectTimerMap[ip2int(addr.IP)] // Receive Ack, stop suspect timer
 		if exist {
 			timer.Stop()
 			Logger.Info("Receive Ack from %s with seq %d\n", addr.IP.String(), header.Seq)
-			delete(SuspectTimerMap, header.Seq-1) // Delete timer to avoid memory overflow
+			delete(SuspectTimerMap, ip2int(addr.IP)) // Delete timer to avoid memory overflow
 		}
 
 		if header.Type&MemInitReply != 0 {
@@ -390,10 +390,10 @@ func handleSuspect(payload []byte) {
 		// Someone else is being suspected
 		MyList.Update(update.MemberTimestamp, update.MemberIP, update.MemberState)
 		UpdateCacheList.Set(&update)
-		timer := time.NewTimer(SuspectPeriod)
-		FailureTimerMap[[2]uint64{update.MemberTimestamp, uint64(update.MemberIP)}] = timer
+		failureTimer := time.NewTimer(SuspectPeriod)
+		FailureTimerMap[[2]uint64{update.MemberTimestamp, uint64(update.MemberIP)}] = failureTimer
 		go func() {
-			<-timer.C
+			<-failureTimer.C
 			err := MyList.Delete(update.MemberTimestamp, update.MemberIP)
 			if err == nil {
 				Logger.Info("[Failure Detected](%s, %d) Failed, detected by suspect update\n", int2ip(update.MemberIP).String(), update.MemberTimestamp)
@@ -409,9 +409,14 @@ func handleResume(payload []byte) {
 
 	updateID := update.UpdateID
 	if !isUpdateDuplicate(updateID) {
-		timer, exist := FailureTimerMap[[2]uint64{update.MemberTimestamp, uint64(update.MemberIP)}]
+		suspectTimer, exist := SuspectTimerMap[update.MemberIP]
 		if exist {
-			timer.Stop()
+			suspectTimer.Stop()
+			delete(SuspectTimerMap, update.MemberIP)
+		}
+		failureTimer, exist := FailureTimerMap[[2]uint64{update.MemberTimestamp, uint64(update.MemberIP)}]
+		if exist {
+			failureTimer.Stop()
 			delete(FailureTimerMap, [2]uint64{update.MemberTimestamp, uint64(update.MemberIP)})
 		}
 		err := MyList.Update(update.MemberTimestamp, update.MemberIP, update.MemberState)
@@ -548,29 +553,32 @@ func pingWithPayload(member *Member, payload []byte, flag uint8) {
 	}
 	Logger.Info("Ping (%s, %d)\n", addr, seq)
 
-	// Set timer to detect failure
-	suspectTimer := time.NewTimer(PingTimeoutPeriod)
-	SuspectTimerMap[uint16(seq)] = suspectTimer
-	go func() {
-		<-suspectTimer.C
-		Logger.Info("Ping (%s, %d) timeout\n", addr, seq)
-		err := MyList.Update(member.Timestamp, member.IP, StateSuspect)
-		if err == nil {
-			addUpdateToCache(member, MemUpdateSuspect)
-		}
-		delete(SuspectTimerMap, uint16(seq))
-		// Handle local suspect timeout
-		failureTimer := time.NewTimer(SuspectPeriod)
-		FailureTimerMap[[2]uint64{member.Timestamp, uint64(member.IP)}] = failureTimer
+	// Set timer to detect failure. Use target IP to track timer
+	_, exist := SuspectTimerMap[member.IP]
+	if !exist {
+		suspectTimer := time.NewTimer(PingTimeoutPeriod)
+		SuspectTimerMap[member.IP] = suspectTimer
 		go func() {
-			<-failureTimer.C
-			err := MyList.Delete(member.Timestamp, member.IP)
+			<-suspectTimer.C
+			Logger.Info("Ping (%s, %d) timeout\n", addr, seq)
+			err := MyList.Update(member.Timestamp, member.IP, StateSuspect)
 			if err == nil {
-				Logger.Info("[Failure Detected](%s, %d) Failed, detected by self\n", int2ip(member.IP).String(), member.Timestamp)
+				addUpdateToCache(member, MemUpdateSuspect)
 			}
-			delete(FailureTimerMap, [2]uint64{member.Timestamp, uint64(member.IP)})
+			delete(SuspectTimerMap, member.IP)
+			// Handle local suspect timeout
+			failureTimer := time.NewTimer(SuspectPeriod)
+			FailureTimerMap[[2]uint64{member.Timestamp, uint64(member.IP)}] = failureTimer
+			go func() {
+				<-failureTimer.C
+				err := MyList.Delete(member.Timestamp, member.IP)
+				if err == nil {
+					Logger.Info("[Failure Detected](%s, %d) Failed, detected by self\n", int2ip(member.IP).String(), member.Timestamp)
+				}
+				delete(FailureTimerMap, [2]uint64{member.Timestamp, uint64(member.IP)})
+			}()
 		}()
-	}()
+	}
 }
 
 func ping(member *Member) {
@@ -591,7 +599,7 @@ func Initilize() bool {
 	MyList = NewMemberList(20)
 
 	// Make necessary Maps
-	SuspectTimerMap = make(map[uint16]*time.Timer)
+	SuspectTimerMap = make(map[uint32]*time.Timer)
 	FailureTimerMap = make(map[[2]uint64]*time.Timer)
 	DuplicateUpdateMap = make(map[uint64]bool)
 	UpdateCacheList = NewTtlCache()
