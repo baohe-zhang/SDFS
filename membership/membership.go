@@ -25,9 +25,9 @@ const (
 	StateMonit         = 0x01 << 2
 	StateIntro         = 0x01 << 3
 	InitTimeoutPeriod  = 2000 * time.Millisecond
-	PingTimeoutPeriod  = 2000 * time.Millisecond
+	PingTimeoutPeriod  = 3000 * time.Millisecond
 	PingSendingPeriod  = 100 * time.Millisecond
-	SuspectPeriod      = 2000 * time.Millisecond
+	SuspectPeriod      = 3000 * time.Millisecond
 	UpdateDeletePeriod = 15000 * time.Millisecond
 	LeaveDelayPeriod   = 2000 * time.Millisecond
 	TimeToLive         = 4
@@ -368,9 +368,9 @@ func getUpdate() ([]byte, uint8, error) {
 }
 
 // Generate a new update and set it in TTL Cache
-func addUpdateToCache(member *Member, updateType uint8) {
+func addUpdateToCache(member *Member, updateType uint8, ttl uint8) {
 	uid := UpdateCacheList.RandGen.Uint64()
-	update := Update{uid, TimeToLive, updateType, member.Timestamp, member.IP, member.State}
+	update := Update{uid, ttl, updateType, member.Timestamp, member.IP, member.State}
 	UpdateCacheList.Set(&update)
 	// This daemon is the update producer, add this update to the update duplicate cache
 	isUpdateDuplicate(uid)
@@ -384,7 +384,7 @@ func handleSuspect(payload []byte) {
 	if !isUpdateDuplicate(updateID) {
 		// If someone suspect me, tell them I am alvie
 		if MyMember.Timestamp == update.MemberTimestamp && MyMember.IP == update.MemberIP {
-			addUpdateToCache(MyMember, MemUpdateResume)
+			addUpdateToCache(MyMember, MemUpdateResume, TimeToLive+2)
 			return
 		}
 		// Someone else is being suspected
@@ -465,7 +465,7 @@ func initReply(addr string, seq uint16, payload []byte) {
 	var newMember Member
 	deserialize(payload, &newMember)
 	MyList.Insert(&newMember)
-	addUpdateToCache(&newMember, MemUpdateJoin) // Update this new member's join
+	addUpdateToCache(&newMember, MemUpdateJoin, TimeToLive+2) // Update this new member's join
 
 	// Put the entire memberlist to the Init Reply's payload
 	var memBuffer bytes.Buffer // Temp buf to store member's binary value
@@ -563,7 +563,7 @@ func pingWithPayload(member *Member, payload []byte, flag uint8) {
 			Logger.Info("Ping (%s, %d) timeout\n", addr, seq)
 			err := MyList.Update(member.Timestamp, member.IP, StateSuspect)
 			if err == nil {
-				addUpdateToCache(member, MemUpdateSuspect)
+				addUpdateToCache(member, MemUpdateSuspect, TimeToLive)
 			}
 			delete(SuspectTimerMap, member.IP)
 			// Handle local suspect timeout
