@@ -376,14 +376,14 @@ func (dn *dataNode) dialDataNodeReReplica(rrr utils.ReReplicaRequest) {
 	conn.Write(utils.Serialize(rrr))
 	fmt.Println("Dial the next replica node", utils.StringIP(nid.IP))
 
-	buf := make([]byte, 42)
+	buf := make([]byte, BufferSize)
 	n, err := conn.Read(buf)
 	utils.PrintError(err)
 
 	response := utils.ReReplicaGet{}
 	utils.Deserialize(buf[:n], &response)
 	if response.MsgType != utils.ReReplicaGetMsg {
-		fmt.Println("Unexpected message from DataNode:", response.MsgType)
+		fmt.Println("Dial: Unexpected message from DataNode:", response.MsgType)
 		return
 	}
 
