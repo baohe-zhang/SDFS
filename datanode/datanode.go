@@ -123,7 +123,7 @@ func (dn *dataNode) reReplicaReader(conn net.Conn, rrrMsg utils.ReReplicaRespons
 	timestamp := fmt.Sprintf("%d", rrrMsg.Timestamp)
 	filename := hashFilename + ":" + timestamp
 
-	fmt.Println("Replica filename: ", filename)
+	fmt.Println("Receiving replica filename: ", filename)
 
 	// Create file descriptor
 	file, err := os.Create(filename)
@@ -131,10 +131,6 @@ func (dn *dataNode) reReplicaReader(conn net.Conn, rrrMsg utils.ReReplicaRespons
 		fmt.Println(err.Error())
 	}
 	defer file.Close()
-
-	// Ready to receive file
-	conn.Write([]byte("OK"))
-	fmt.Println("Sent OK")
 
 	// Read file data from connection and write to local
 	buf := make([]byte, BufferSize)
@@ -146,7 +142,7 @@ func (dn *dataNode) reReplicaReader(conn net.Conn, rrrMsg utils.ReReplicaRespons
 		receivedBytes += uint64(n)
 
 		if err == io.EOF {
-			fmt.Printf("Receive replica %s finish\n", filename)
+			fmt.Printf("Received replica %s\n", filename)
 			break
 		}
 	}
@@ -192,12 +188,6 @@ func (dn *dataNode) reReplicaWriter(conn net.Conn, rrgMsg utils.ReReplicaGet) {
 	utils.PrintError(err)
 
 	buf := make([]byte, BufferSize)
-	n, err := conn.Read(buf)
-	for string(buf[:n]) != "OK" {
-	}
-	fmt.Println(string(buf[:n]))
-
-	buf = make([]byte, BufferSize)
 	for {
 		n, err := file.Read(buf)
 		conn.Write(buf[:n])
