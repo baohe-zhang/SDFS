@@ -114,7 +114,7 @@ func (mn *masterNode) HandleGetVersionsRequest(gvrMsg utils.GetVersionsRequest, 
 			VersionNum: numVersions,
 			Timestamp:  info.Timestamp,
 		}
-		fmt.Println("Handle GetVersionsRequest and respond:", gvr.info.Timestamp)
+		fmt.Println("Handle GetVersionsRequest and respond:", info.Timestamp)
 		gvr.FilenameHash = utils.HashFilename(filename)
 		gvr.Filesize = info.Filesize
 		nodeIPs := [utils.NumReplica]uint32{}
