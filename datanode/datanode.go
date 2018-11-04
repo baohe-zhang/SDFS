@@ -90,6 +90,7 @@ func (dn *dataNode) reReplicaStat(conn net.Conn, rrrMsg utils.ReReplicaRequest) 
 	} else {
 		rrr.GetNeed = true
 	}
+
 	bin := utils.Serialize(rrr)
 	_, err := conn.Write(bin)
 	utils.PrintError(err)

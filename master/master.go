@@ -171,7 +171,7 @@ func (mn *masterNode) ReReplicaRoutine() {
 						if i < len(ids) {
 							rrr.DataNodeList[i] = ids[i]
 						} else {
-							rrr.DataNodeList[i] = picksID[len(ids)-i]
+							rrr.DataNodeList[i] = picksID[i-len(ids)]
 						}
 					}
 				} else {
