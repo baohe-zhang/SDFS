@@ -7,6 +7,7 @@ import (
 	"simpledfs/master"
 	"simpledfs/membership"
 	"simpledfs/utils"
+	"simpledfs/election"
 )
 
 func main() {
@@ -33,6 +34,9 @@ func main() {
 	nodeID := utils.NodeID{Timestamp: membership.MyMember.Timestamp, IP: membership.MyMember.IP}
 	node := datanode.NewDataNode(fmt.Sprintf("%d", datanodePort), membership.MyList, nodeID)
 	go node.Start()
+
+	elector := election.NewElector(nodeID, membership.MyList)
+	go elector.Start("5003")
 
 	membership.Start(masterIP, fmt.Sprintf("%d", membershipPort))
 }
