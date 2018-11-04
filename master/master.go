@@ -243,7 +243,7 @@ func (mn *masterNode) pickReceivers(fileHolders []utils.NodeID, num int) []utils
 		member := mn.MemberList.Members[i]
 		for _, fileHolder := range fileHolders {
 			if member.Timestamp == fileHolder.Timestamp && member.IP == fileHolder.IP {
-				continue
+				break
 			} else {
 				candidates = append(candidates, utils.NodeID{member.Timestamp, member.IP})
 			}
