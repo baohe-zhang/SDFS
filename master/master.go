@@ -165,7 +165,7 @@ func (mn *masterNode) ReReplicaRoutine() {
 					ids = append(ids, id)
 				}
 
-				if len(ids) < utils.NumReplica {
+				if len(ids) < utils.NumReplica && mn.MemberList.Size() >= utils.NumReplica {
 					picksID := mn.pickReceivers(ids, utils.NumReplica-len(ids))
 					for i := 0; i < utils.NumReplica; i++ {
 						if i < len(ids) {

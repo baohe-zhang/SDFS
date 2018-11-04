@@ -91,29 +91,27 @@ func (dn *dataNode) reReplicaStat(conn net.Conn, rrrMsg utils.ReReplicaRequest) 
 	} else {
 		rrg.GetNeed = true
 	}
-
 	bin := utils.Serialize(rrg)
 	_, err := conn.Write(bin)
 	utils.PrintError(err)
-	if ok {
-		dn.dialDataNodeReReplica(rrrMsg)
+
+	if ok == true {
 		fmt.Println("There has been a replica existing")
-		return
+	} else {
+		buf := make([]byte, 97)
+		n, err := conn.Read(buf)
+		utils.PrintError(err)
+
+		response := utils.ReReplicaResponse{}
+		utils.Deserialize(buf[:n], &response)
+		if response.MsgType != utils.ReReplicaResponseMsg {
+			fmt.Println("Unexpected message from DataNode", response.MsgType)
+			return
+		}
+		dn.reReplicaReader(conn, response)
 	}
 
-	buf := make([]byte, 97)
-	n, err := conn.Read(buf)
-	utils.PrintError(err)
-
-	response := utils.ReReplicaResponse{}
-	utils.Deserialize(buf[:n], &response)
-	if response.MsgType != utils.ReReplicaResponseMsg {
-		fmt.Println("Unexpected message from DataNode")
-		return
-	}
-	dn.reReplicaReader(conn, response)
-
-	dn.dialDataNodeReReplica(rrrMsg)
+	go dn.dialDataNodeReReplica(rrrMsg)
 }
 
 func (dn *dataNode) reReplicaReader(conn net.Conn, rrrMsg utils.ReReplicaResponse) {
@@ -302,7 +300,7 @@ func (dn *dataNode) fileWriter(conn net.Conn, rr utils.ReadRequest) {
 	//}
 	/*}*/
 
-	fmt.Println("client ready to receive file")
+	//fmt.Println("client ready to receive file")
 
 	buf := make([]byte, BufferSize)
 
@@ -310,7 +308,7 @@ func (dn *dataNode) fileWriter(conn net.Conn, rr utils.ReadRequest) {
 		n, err := file.Read(buf)
 		conn.Write(buf[:n])
 		if err == io.EOF {
-			fmt.Printf("send file %s finish\n", filename)
+			fmt.Printf("Send file %s finish\n", filename)
 			break
 		}
 	}
@@ -362,12 +360,6 @@ func (dn *dataNode) dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 
 // Dial DataNode with ReReplicaRequest transfer
 func (dn *dataNode) dialDataNodeReReplica(rrr utils.ReReplicaRequest) {
-	rrr.TimeToLive -= 1
-	if rrr.TimeToLive == 0 {
-		fmt.Println("Replica TTL expired")
-		return
-	}
-
 	nid, err := dn.getNexthopID(rrr.DataNodeList[:])
 	if err != nil {
 		fmt.Println("Get Node ID failed")
