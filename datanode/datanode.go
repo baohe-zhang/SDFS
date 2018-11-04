@@ -413,9 +413,12 @@ func (dn *dataNode) getNexthopID(nodeList []utils.NodeID) (utils.NodeID, error) 
 	return utils.NodeID{}, errors.New("Nexthop doesn't exists")
 }
 
-// Return the first non-zero nodeID's index
+// Return the matched nodeID
 func (dn *dataNode) getNexthopIDCircle(nodeList []utils.NodeID) (utils.NodeID, error) {
 	for k, v := range nodeList {
+		if v.IP == 0 || v.Timestamp == 0 {
+			break
+		}
 		if v == dn.NodeID && k < len(nodeList) &&
 			nodeList[(k+1)%len(nodeList)].IP != 0 && nodeList[(k+1)%len(nodeList)].Timestamp != 0 {
 			return nodeList[(k+1)%len(nodeList)], nil
