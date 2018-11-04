@@ -74,20 +74,6 @@ func (dn *dataNode) Handler(conn net.Conn) {
 		utils.Deserialize(buf[:n], &msg)
 
 		dn.reReplicaStat(conn, msg)
-	} else if buf[0] == utils.ReReplicaResponseMsg {
-		// Receive re-replica response from peer
-		fmt.Println("Receive re-replica response")
-		msg := utils.ReReplicaResponse{}
-		utils.Deserialize(buf[:n], &msg)
-
-		dn.reReplicaReader(conn, msg)
-	} else if buf[0] == utils.ReReplicaGetMsg {
-		// Receive re-replica get from peer
-		fmt.Println("Receive re-replica get")
-		msg := utils.ReReplicaGet{}
-		utils.Deserialize(buf[:n], &msg)
-
-		dn.reReplicaWriter(conn, msg)
 	}
 
 }
@@ -96,24 +82,36 @@ func (dn *dataNode) Handler(conn net.Conn) {
 func (dn *dataNode) reReplicaStat(conn net.Conn, rrrMsg utils.ReReplicaRequest) {
 	hashFilename := utils.Hash2Text(rrrMsg.FilenameHash[:])
 	fmt.Println("ReplicaStat", hashFilename)
-	_, ok := meta.FileInfo(hashFilename)
-	dn.dialDataNodeReReplica(rrrMsg)
-	if ok {
-		fmt.Println("There has been a replica")
-		return
-	}
-
-	connGet, err := net.Dial("tcp", conn.RemoteAddr().(*net.TCPAddr).IP.String()+":"+dn.NodePort)
-	if err != nil {
-		utils.PrintError(err)
-		return
-	}
+	_, ok := meta.FileInfoWithTs(hashFilename, rrrMsg.Timestamp)
 
 	rrr := utils.ReReplicaGet{MsgType: utils.ReReplicaGetMsg, FilenameHash: rrrMsg.FilenameHash}
+	if ok {
+		rrr.GetNeed = false
+	} else {
+		rrr.GetNeed = true
+	}
 	bin := utils.Serialize(rrr)
-	_, err = connGet.Write(bin)
+	_, err := conn.Write(bin)
+	utils.PrintError(err)
+	if ok {
+		dn.dialDataNodeReReplica(rrrMsg)
+		fmt.Println("There has been a replica existing")
+		return
+	}
+
+	buf := make([]byte, BufferSize)
+	n, err := conn.Read(buf)
 	utils.PrintError(err)
 
+	response := utils.ReReplicaResponse{}
+	utils.Deserialize(buf[:n], &response)
+	if response.MsgType != utils.ReReplicaResponseMsg {
+		fmt.Println("Unexpected message from DataNode")
+		return
+	}
+	dn.reReplicaReader(conn, response)
+
+	dn.dialDataNodeReReplica(rrrMsg)
 	meta.UpdateFileInfo(hashFilename, rrrMsg.DataNodeList[:])
 }
 
@@ -167,55 +165,45 @@ func (dn *dataNode) reReplicaReader(conn net.Conn, rrrMsg utils.ReReplicaRespons
 }
 
 func (dn *dataNode) reReplicaWriter(conn net.Conn, rrgMsg utils.ReReplicaGet) {
-
 	hashFilename := utils.Hash2Text(rrgMsg.FilenameHash[:])
-	infos, ok := meta.FileInfos(hashFilename)
+	info, ok := meta.FileInfoWithTs(hashFilename, rrgMsg.Timestamp)
 	if ok == false {
 		fmt.Println("ReReplica failed for this node has no info of this file")
 		return
 	}
 
-	for i := 0; i < len(infos); i++ {
-		connResponse, err := net.Dial("tcp", conn.RemoteAddr().(*net.TCPAddr).IP.String()+":"+dn.NodePort)
-		if err != nil {
-			utils.PrintError(err)
-			return
+	file, err := os.OpenFile(hashFilename+":"+fmt.Sprintf("%d", info.Timestamp), os.O_RDONLY, 0755)
+	utils.PrintError(err)
+
+	rrr := utils.ReReplicaResponse{
+		MsgType:      utils.ReReplicaResponseMsg,
+		Filesize:     info.Filesize,
+		Timestamp:    info.Timestamp,
+		FilenameHash: rrgMsg.FilenameHash,
+	}
+
+	for k, v := range info.DataNodes {
+		rrr.DataNodeList[k] = v
+	}
+
+	bin := utils.Serialize(rrr)
+	_, err = conn.Write(bin)
+	utils.PrintError(err)
+
+	buf := make([]byte, BufferSize)
+	n, err := conn.Read(buf)
+	for string(buf[:n]) != "OK" {
+	}
+	fmt.Println(string(buf[:n]))
+
+	buf = make([]byte, BufferSize)
+	for {
+		n, err := file.Read(buf)
+		conn.Write(buf[:n])
+		if err == io.EOF {
+			fmt.Println("Send ReReplica", hashFilename, "finish")
+			break
 		}
-
-		file, err := os.OpenFile(hashFilename+":"+fmt.Sprintf("%d", infos[i].Timestamp), os.O_RDONLY, 0755)
-		utils.PrintError(err)
-
-		rrr := utils.ReReplicaResponse{
-			MsgType:      utils.ReReplicaResponseMsg,
-			Filesize:     infos[i].Filesize,
-			Timestamp:    infos[i].Timestamp,
-			FilenameHash: rrgMsg.FilenameHash,
-		}
-
-		for k, v := range infos[i].DataNodes {
-			rrr.DataNodeList[k] = v
-		}
-
-		bin := utils.Serialize(rrr)
-		_, err = connResponse.Write(bin)
-		utils.PrintError(err)
-
-		buf := make([]byte, BufferSize)
-		n, err := connResponse.Read(buf)
-		for string(buf[:n]) != "OK" {
-		}
-		fmt.Println(string(buf[:n]))
-
-		buf = make([]byte, BufferSize)
-		for {
-			n, err := file.Read(buf)
-			connResponse.Write(buf[:n])
-			if err == io.EOF {
-				fmt.Println("Send ReReplica file finish")
-				break
-			}
-		}
-
 	}
 
 }
@@ -362,7 +350,6 @@ func (dn *dataNode) dialDataNode(wr utils.WriteRequest) (*net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("Get Node ID")
 
 	conn, err := net.Dial("tcp", utils.StringIP(nodeID.IP)+":"+dn.NodePort)
 	if err != nil {
@@ -403,6 +390,23 @@ func (dn *dataNode) dialDataNodeReReplica(rrr utils.ReReplicaRequest) {
 
 	// Send re-replica request to the next hop
 	conn.Write(utils.Serialize(rrr))
+
+	buf := make([]byte, BufferSize)
+	n, err := conn.Read(buf)
+	utils.PrintError(err)
+
+	response := utils.ReReplicaGet{}
+	utils.Deserialize(buf[:n], &response)
+	if response.MsgType != utils.ReReplicaGetMsg {
+		fmt.Println("Unexpected message from DataNode")
+		return
+	}
+
+	if response.GetNeed == false {
+		return
+	}
+
+	dn.reReplicaWriter(conn, response)
 }
 
 // Return the first non-zero nodeID's index

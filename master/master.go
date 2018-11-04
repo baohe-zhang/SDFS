@@ -144,40 +144,43 @@ func (mn *masterNode) HandleStoreRequest(srMsg utils.StoreRequest, conn net.Conn
 // Send the re-replica request to a node who has this file and pipeline the checking
 func (mn *masterNode) ReReplicaRoutine() {
 	for {
-		for file, info := range meta {
+		for file, infos := range meta {
 			filename := hashtextToFilenameMap[file]
-			dataNodes := info[0].DataNodes
-			rrr := utils.ReReplicaRequest{
-				MsgType:      utils.ReReplicaRequestMsg,
-				FilenameHash: utils.HashFilename(filename),
-				TimeToLive:   4,
-			}
+			for _, info := range infos {
+				dataNodes := info.DataNodes
+				rrr := utils.ReReplicaRequest{
+					MsgType:      utils.ReReplicaRequestMsg,
+					FilenameHash: utils.HashFilename(filename),
+					Timestamp:    info.Timestamp,
+					TimeToLive:   4,
+				}
 
-			ids := make([]utils.NodeID, 0)
-			for _, id := range dataNodes {
-				_, err := mn.MemberList.Retrieve(id.Timestamp, id.IP)
-				if err != nil {
-					utils.PrintError(err)
+				ids := make([]utils.NodeID, 0)
+				for _, id := range dataNodes {
+					_, err := mn.MemberList.Retrieve(id.Timestamp, id.IP)
+					if err != nil {
+						utils.PrintError(err)
+						continue
+					}
+					ids = append(ids, id)
+				}
+
+				if len(ids) < utils.NumReplica {
+					picksID := mn.pickReceivers(ids, utils.NumReplica-len(ids))
+					for i := 0; i < utils.NumReplica; i++ {
+						if i < len(ids) {
+							rrr.DataNodeList[i] = ids[i]
+						} else {
+							rrr.DataNodeList[i] = picksID[len(ids)-i]
+						}
+					}
+				} else {
 					continue
 				}
-				ids = append(ids, id)
-			}
 
-			if len(ids) < utils.NumReplica {
-				picksID := mn.pickReceivers(ids, utils.NumReplica-len(ids))
-				for i := 0; i < utils.NumReplica; i++ {
-					if i < len(ids) {
-						rrr.DataNodeList[i] = ids[i]
-					} else {
-						rrr.DataNodeList[i] = picksID[len(ids)-i]
-					}
-				}
-			} else {
-				continue
+				mn.ReReplicaRequest(rrr, utils.StringIP(ids[len(ids)-1].IP)+":"+utils.StringPort(mn.DNPort))
+				meta.UpdateFileInfo(utils.Hash2Text(rrr.FilenameHash[:]), rrr.DataNodeList[:])
 			}
-
-			mn.ReReplicaRequest(rrr, utils.StringIP(ids[len(ids)-1].IP)+":"+utils.StringPort(mn.DNPort))
-			meta.UpdateFileInfo(utils.Hash2Text(rrr.FilenameHash[:]), rrr.DataNodeList[:])
 		}
 		time.Sleep(1 * time.Second)
 	}
@@ -230,35 +233,6 @@ func (mn *masterNode) Handle(conn net.Conn) {
 	}
 }
 
-func (mn *masterNode) pruneMeta(timestamp uint64, ip uint32) {
-	for _, infos := range meta {
-		for _, info := range infos {
-			newDataNodes := make([]utils.NodeID, 0) // Store new node list
-			for _, nid := range info.DataNodes {
-				if timestamp == nid.Timestamp && ip == nid.IP {
-					continue
-				} else {
-					newDataNodes = append(newDataNodes, nid)
-				}
-			}
-			info.DataNodes = newDataNodes
-		}
-	}
-}
-
-func (mn *masterNode) restoreMeta() {
-	for filename, infos := range meta {
-		for _, info := range infos {
-			if len(info.DataNodes) < 4 {
-				sender := info.DataNodes[0] // Pick the first node as the copy sender
-				num := 4 - len(info.DataNodes)
-				receivers := mn.pickReceivers(info.DataNodes, num)
-				mn.sendCopyRequest(filename, info.Timestamp, sender, receivers)
-			}
-		}
-	}
-}
-
 func (mn *masterNode) pickReceivers(fileHolders []utils.NodeID, num int) []utils.NodeID {
 	receivers := make([]utils.NodeID, 0)
 	candidates := make([]utils.NodeID, 0)
@@ -275,6 +249,10 @@ func (mn *masterNode) pickReceivers(fileHolders []utils.NodeID, num int) []utils
 		}
 	}
 
+	if len(candidates) < num {
+		return candidates
+	}
+
 	receiverIndexs := rand.Perm(len(candidates))[:num] // Pick random receivers
 
 	for _, recvIdx := range receiverIndexs {
@@ -282,10 +260,6 @@ func (mn *masterNode) pickReceivers(fileHolders []utils.NodeID, num int) []utils
 	}
 
 	return receivers
-}
-
-func (mn *masterNode) sendCopyRequest(filename string, timestamp uint64, sender utils.NodeID, receivers []utils.NodeID) {
-
 }
 
 func (mn *masterNode) Start() {

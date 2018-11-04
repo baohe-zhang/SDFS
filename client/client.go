@@ -336,7 +336,6 @@ func main() {
 			fmt.Println("Invalid store usage")
 			usage()
 		}
-		fmt.Println(args[1:])
 		storeCommand(masterConn)
 	case "get-versions":
 		if len(args) != 4 {

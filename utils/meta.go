@@ -53,6 +53,18 @@ func (meta Meta) FileInfo(filename string) (Info, bool) {
 	}
 }
 
+func (meta Meta) FileInfoWithTs(filename string, ts uint64) (Info, bool) {
+	infos, ok := meta[filename]
+	if ok {
+		for _, info := range infos {
+			if info.Timestamp == ts {
+				return info, true
+			}
+		}
+	}
+	return Info{}, false
+}
+
 func (meta Meta) FileInfos(filename string) (Infos, bool) {
 	val, ok := meta[filename]
 	if ok {

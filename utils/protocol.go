@@ -108,6 +108,7 @@ type StoreResponse struct {
 type ReReplicaRequest struct {
 	MsgType      uint8
 	FilenameHash [32]byte
+	Timestamp    uint64
 	DataNodeList [NumReplica]NodeID
 	TimeToLive   uint8
 }
@@ -115,6 +116,8 @@ type ReReplicaRequest struct {
 type ReReplicaGet struct {
 	MsgType      uint8
 	FilenameHash [32]byte
+	Timestamp    uint64
+	GetNeed      bool
 }
 
 type ReReplicaResponse struct {
