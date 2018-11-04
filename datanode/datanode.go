@@ -108,6 +108,7 @@ func (dn *dataNode) reReplicaStat(conn net.Conn, rrrMsg utils.ReReplicaRequest) 
 		utils.PrintError(err)
 		return
 	}
+
 	rrr := utils.ReReplicaGet{MsgType: utils.ReReplicaGetMsg, FilenameHash: rrrMsg.FilenameHash}
 	bin := utils.Serialize(rrr)
 	_, err = connGet.Write(bin)
@@ -214,6 +215,7 @@ func (dn *dataNode) reReplicaWriter(conn net.Conn, rrgMsg utils.ReReplicaGet) {
 				break
 			}
 		}
+
 	}
 
 }
