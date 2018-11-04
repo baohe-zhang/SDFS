@@ -382,7 +382,7 @@ func (dn *dataNode) dialDataNodeReReplica(rrr utils.ReReplicaRequest) {
 
 	// Send re-replica request to the next hop
 	conn.Write(utils.Serialize(rrr))
-	fmt.Println("Dial the next replica node")
+	fmt.Println("Dial the next replica node", utils.StringIP(nid.IP))
 
 	buf := make([]byte, 42)
 	n, err := conn.Read(buf)
@@ -391,7 +391,7 @@ func (dn *dataNode) dialDataNodeReReplica(rrr utils.ReReplicaRequest) {
 	response := utils.ReReplicaGet{}
 	utils.Deserialize(buf[:n], &response)
 	if response.MsgType != utils.ReReplicaGetMsg {
-		fmt.Println("Unexpected message from DataNode")
+		fmt.Println("Unexpected message from DataNode:", response.MsgType)
 		return
 	}
 
@@ -402,7 +402,7 @@ func (dn *dataNode) dialDataNodeReReplica(rrr utils.ReReplicaRequest) {
 	dn.reReplicaWriter(conn, response)
 }
 
-// Return the first non-zero nodeID's index
+// Return the first nodeID
 func (dn *dataNode) getNexthopID(nodeList []utils.NodeID) (utils.NodeID, error) {
 	for k, v := range nodeList {
 		if v == dn.NodeID && k < len(nodeList)-1 &&
