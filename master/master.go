@@ -177,8 +177,9 @@ func (mn *masterNode) ReReplicaRoutine() {
 				} else {
 					continue
 				}
+				fmt.Println(rrr.DataNodeList)
 
-				mn.ReReplicaRequest(rrr, utils.StringIP(ids[len(ids)-1].IP)+":"+utils.StringPort(mn.DNPort))
+				mn.ReReplicaRequest(rrr, utils.StringIP(ids[0].IP)+":"+utils.StringPort(mn.DNPort))
 				meta.UpdateFileInfo(utils.Hash2Text(rrr.FilenameHash[:]), rrr.DataNodeList[:])
 			}
 		}
