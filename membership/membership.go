@@ -30,7 +30,7 @@ const (
 	SuspectPeriod      = 3000 * time.Millisecond
 	UpdateDeletePeriod = 15000 * time.Millisecond
 	LeaveDelayPeriod   = 2000 * time.Millisecond
-	TimeToLive         = 4
+	TimeToLive         = 3
 	HeaderLength       = 4
 )
 
