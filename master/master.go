@@ -169,14 +169,14 @@ func (mn *masterNode) ReReplicaRoutine() {
 					if i < len(ids) {
 						rrr.DataNodeList[i] = ids[i]
 					} else {
-						rrr.DataNodeList[i] = picksID[i-len(ids)]
+						rrr.DataNodeList[i] = picksID[len(ids)-i]
 					}
 				}
 			} else {
 				continue
 			}
 
-			mn.ReReplicaRequest(rrr, utils.StringIP(rrr.DataNodeList[0].IP)+":"+utils.StringPort(mn.DNPort))
+			mn.ReReplicaRequest(rrr, utils.StringIP(ids[len(ids)-1].IP)+":"+utils.StringPort(mn.DNPort))
 			meta.UpdateFileInfo(utils.Hash2Text(rrr.FilenameHash[:]), rrr.DataNodeList[:])
 		}
 		time.Sleep(1 * time.Second)
@@ -299,6 +299,7 @@ func (mn *masterNode) Start() {
 		return
 	}
 	go mn.ReReplicaRoutine()
+
 	for {
 		conn, err := listener.Accept()
 		defer conn.Close()
