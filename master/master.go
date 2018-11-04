@@ -250,6 +250,8 @@ func (mn *masterNode) pickReceivers(fileHolders []utils.NodeID, num int) []utils
 		}
 	}
 
+	fmt.Println(candidates)
+
 	if len(candidates) < num {
 		return candidates
 	}
