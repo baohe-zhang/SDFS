@@ -183,7 +183,6 @@ func (mn *masterNode) ReReplicaRoutine() {
 				meta.UpdateFileInfo(utils.Hash2Text(rrr.FilenameHash[:]), rrr.DataNodeList[:])
 			}
 		}
-		time.Sleep(1 * time.Second)
 	}
 }
 
