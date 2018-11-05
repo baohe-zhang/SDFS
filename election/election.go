@@ -10,9 +10,6 @@ import (
 
 const (
 	ElecTimeoutPeriod = 5000 * time.Millisecond
-	ELECTION          = 1
-	OK                = 2
-	COORDINATOR       = 3
 )
 
 var ElectionPort string
@@ -51,21 +48,21 @@ func (e *Elector) listener() {
 
 	for {
 		packet := make([]byte, 256)
-		_, addr, err := uconn.ReadFromUDP(packet)
+		n, addr, err := uconn.ReadFromUDP(packet)
 		if err != nil {
 			fmt.Println(err.Error())
 		}
 
-		e.handler(packet, addr)
+		e.handler(packet[:n], addr)
 	}
 }
 
 func (e *Elector) handler(packet []byte, addr *net.UDPAddr) {
-	fmt.Println("receive %v", packet)
+	fmt.Println("receive %s", string(packet[:]))
 
 	if string(packet[:]) == "election" {
 		if e.NodeID.IP > utils.BinaryIP(addr.IP.String()) {
-			sendUDP(addr.IP.String()+":"+ElectionPort, []byte{OK})
+			sendUDP(addr.IP.String()+":"+ElectionPort, []byte("ok"))
 			e.Election()
 		}
 
@@ -89,7 +86,7 @@ func (e *Elector) Election() {
 		member := e.MemberList.Members[i]
 		if e.NodeID.IP < member.IP {
 			fmt.Printf("send election to %s\n", utils.StringIP(member.IP))
-			sendUDP(utils.StringIP(member.IP)+":"+ElectionPort, []byte{ELECTION})
+			sendUDP(utils.StringIP(member.IP)+":"+ElectionPort, []byte("election"))
 		}
 	}
 
@@ -105,7 +102,7 @@ func (e *Elector) Election() {
 func (e *Elector) Coordination() {
 	for i := 0; i < e.MemberList.Size(); i++ {
 		member := e.MemberList.Members[i]
-		sendUDP(utils.StringIP(member.IP)+":"+ElectionPort, []byte{COORDINATOR})
+		sendUDP(utils.StringIP(member.IP)+":"+ElectionPort, []byte("coordinator"))
 	}
 }
 
