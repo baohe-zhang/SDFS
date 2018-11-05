@@ -10,32 +10,28 @@ import (
 	"simpledfs/election"
 )
 
-func detectNodeFailure(elector *election.Elector, tch chan uint64, ich chan uint32) {
+var masterIP string
+
+func detector(elector *election.Elector, tch chan uint64, ich chan uint32, mch chan uint32) {
 	for {
 		select {
 			case <-tch:
 				ip := <-ich
 				fmt.Printf("node %s failed\n", utils.StringIP(ip))
-				if utils.StringIP(ip) == "172.22.156.95" {
+				if utils.StringIP(ip) == masterIP {
 					fmt.Printf("master failed. election start\n")
 					elector.Election()
 				}
 
-			default:
-		}
-	}
-}
-
-func detectNewMaster(mch chan uint32) {
-	for {
-		select {
 			case mip := <-mch:
 				fmt.Printf("daemon has new master ip %s\n", utils.StringIP(mip))
+				masterIP = utils.StringIP(mip)
 
 			default:
 		}
 	}
 }
+
 
 func main() {
 	masterIpPtr := flag.String("master", "127.0.0.1", "Master's IP")
@@ -43,7 +39,7 @@ func main() {
 	membershipPortPtr := flag.Int("mem-port", 5001, "Membership serving port")
 	datanodePortPtr := flag.Int("dn-port", 5002, "DataNode serving port")
 	flag.Parse()
-	masterIP := *masterIpPtr
+	masterIP = *masterIpPtr
 	masternodePort := *masternodePortPtr
 	membershipPort := *membershipPortPtr
 	datanodePort := *datanodePortPtr
@@ -70,8 +66,7 @@ func main() {
 	elector := election.NewElector(nodeID, membership.MyList)
 	go elector.Start("5003", msch) 
 
-	go detectNodeFailure(elector, tsch, ipch)
-	go detectNewMaster(msch)
+	go detector(elector, tsch, ipch, msch)
 
 	membership.Start(masterIP, fmt.Sprintf("%d", membershipPort), tsch, ipch)
 }

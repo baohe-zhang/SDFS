@@ -24,7 +24,7 @@ const (
 	StateSuspect       = 0x01 << 1
 	StateMonit         = 0x01 << 2
 	StateIntro         = 0x01 << 3
-	InitTimeoutPeriod  = 2000 * time.Millisecond
+	InitTimeoutPeriod  = 5000 * time.Millisecond
 	PingTimeoutPeriod  = 3000 * time.Millisecond
 	PingSendingPeriod  = 100 * time.Millisecond
 	SuspectPeriod      = 3000 * time.Millisecond
