@@ -386,6 +386,7 @@ func (mn *masterNode) Start() {
 	//meta = utils.NewMeta("MasterMeta")
 	meta = utils.Meta{}
 	hashtextToFilenameMap = make(map[string]string)
+	writeConfirmCountMap = make(map[uint64]int)
 
 	listener, err := net.Listen("tcp", ":"+mn.Port)
 	if err != nil {
