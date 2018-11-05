@@ -3,13 +3,16 @@ package election
 import (
 	"fmt"
 	"net"
-	"time"
 	"simpledfs/membership"
 	"simpledfs/utils"
+	"time"
 )
 
 const (
 	ElecTimeoutPeriod = 5000 * time.Millisecond
+	ELECTION          = 1
+	OK                = 2
+	COORDINATOR       = 3
 )
 
 var ElectionPort string
@@ -22,7 +25,7 @@ type Elector struct {
 
 func NewElector(nodeid utils.NodeID, memberlist *membership.MemberList) *Elector {
 	elector := Elector{
-		NodeID: nodeid,
+		NodeID:     nodeid,
 		MemberList: memberlist,
 	}
 	return &elector
@@ -39,7 +42,7 @@ func sendUDP(addr string, packet []byte) {
 }
 
 func (e *Elector) listener() {
-	udpAddr, _ := net.ResolveUDPAddr("udp4", ":" + ElectionPort)
+	udpAddr, _ := net.ResolveUDPAddr("udp4", ":"+ElectionPort)
 	uconn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -62,7 +65,7 @@ func (e *Elector) handler(packet []byte, addr *net.UDPAddr) {
 
 	if string(packet[:]) == "election" {
 		if e.NodeID.IP > utils.BinaryIP(addr.IP.String()) {
-			sendUDP(addr.IP.String() + ":" + ElectionPort, []byte("ok"))
+			sendUDP(addr.IP.String()+":"+ElectionPort, []byte{OK})
 			e.Election()
 		}
 
@@ -86,7 +89,7 @@ func (e *Elector) Election() {
 		member := e.MemberList.Members[i]
 		if e.NodeID.IP < member.IP {
 			fmt.Printf("send election to %s\n", utils.StringIP(member.IP))
-			sendUDP(utils.StringIP(member.IP) + ":" + ElectionPort, []byte("election"))
+			sendUDP(utils.StringIP(member.IP)+":"+ElectionPort, []byte{ELECTION})
 		}
 	}
 
@@ -102,7 +105,7 @@ func (e *Elector) Election() {
 func (e *Elector) Coordination() {
 	for i := 0; i < e.MemberList.Size(); i++ {
 		member := e.MemberList.Members[i]
-		sendUDP(utils.StringIP(member.IP) + ":" + ElectionPort, []byte("coordinator"))
+		sendUDP(utils.StringIP(member.IP)+":"+ElectionPort, []byte{COORDINATOR})
 	}
 }
 
@@ -111,4 +114,3 @@ func (e *Elector) Start(port string) {
 	fmt.Println("elector start")
 	e.listener()
 }
-
