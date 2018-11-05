@@ -39,7 +39,7 @@ func sendUDP(addr string, packet []byte) {
 }
 
 func (e *Elector) listener() {
-	udpAddr, _ := net.ResolveUDPAddr("udp4", ElectionPort)
+	udpAddr, _ := net.ResolveUDPAddr("udp4", ":" + ElectionPort)
 	uconn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -58,6 +58,8 @@ func (e *Elector) listener() {
 }
 
 func (e *Elector) handler(packet []byte, addr *net.UDPAddr) {
+	fmt.Println("receive %v", packet)
+
 	if string(packet[:]) == "election" {
 		if e.NodeID.IP > utils.BinaryIP(addr.IP.String()) {
 			sendUDP(addr.IP.String() + ":" + ElectionPort, []byte("ok"))
@@ -83,7 +85,7 @@ func (e *Elector) Election() {
 	for i := 0; i < e.MemberList.Size(); i++ {
 		member := e.MemberList.Members[i]
 		if e.NodeID.IP < member.IP {
-			fmt.Printf("send election to %s", utils.StringIP(member.IP))
+			fmt.Printf("send election to %s\n", utils.StringIP(member.IP))
 			sendUDP(utils.StringIP(member.IP) + ":" + ElectionPort, []byte("election"))
 		}
 	}
