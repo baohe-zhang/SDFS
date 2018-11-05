@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	ElecTimeoutPeriod = 5000 * time.Millisecond
+	ElecTimeoutPeriod = 8000 * time.Millisecond
 )
 
 var ElectionPort string
@@ -58,12 +58,9 @@ func (e *Elector) listener() {
 }
 
 func (e *Elector) handler(packet []byte, addr *net.UDPAddr) {
-	fmt.Println("receive %s", string(packet[:]))
-
 	if string(packet[:]) == "election" {
 		if e.NodeID.IP > utils.BinaryIP(addr.IP.String()) {
 			sendUDP(addr.IP.String()+":"+ElectionPort, []byte("ok"))
-			e.Election()
 		}
 
 	} else if string(packet[:]) == "ok" {
