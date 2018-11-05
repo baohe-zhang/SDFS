@@ -63,7 +63,7 @@ var DuplicateUpdateMap map[uint64]bool
 var UpdateCacheList *TtlCache
 var Logger *ssmsLogger
 
-var wg sync.WaitGroup // Block goroutines until user type join
+// var wg sync.WaitGroup // Block goroutines until user type join
 var mutex sync.Mutex  // Mutex used for duplicate update caches write
 
 var tsch chan uint64
@@ -128,7 +128,7 @@ func daemon() {
 	cc := make(chan string)
 	go readCommand(cc)
 
-	wg.Add(1) // Wait until user type join
+	// wg.Add(1) // Wait until user type join
 
 	go packetListenner() // Packet listening goroutine
 	go periodicPing()    // Packet sending goroutine
@@ -157,7 +157,7 @@ func commandHandler(c chan string) {
 				fmt.Println("Already in the group")
 				continue
 			}
-			wg.Done() // Notify other gorountne that this process have joined the membership
+			// wg.Done() // Notify other gorountne that this process have joined the membership
 
 			if MyIP == IntroducerIP {
 				MyMember.State |= (StateIntro | StateMonit)
@@ -178,7 +178,7 @@ func commandHandler(c chan string) {
 				fmt.Println("Haven't join the group")
 				continue
 			}
-			wg.Add(1)
+			// wg.Add(1)
 			initiateLeave()
 
 		case "help":
@@ -196,8 +196,7 @@ func commandHandler(c chan string) {
 
 // Periodically ping a randomly selected target
 func periodicPing() {
-	wg.Wait() // Wait for user to type join
-
+	// wg.Wait() // Wait for user to type join
 	for {
 		// Shuffle membership list and get a member
 		// Only executed when the membership list is not empty
@@ -224,8 +223,7 @@ func periodicPing() {
 }
 
 func packetListenner() {
-	wg.Wait() // Wait for user to type join
-
+	// wg.Wait() // Wait for user to type join
 	udpAddr, _ := net.ResolveUDPAddr("udp4", MembershipPort)
 	uconn, err := net.ListenUDP("udp", udpAddr)
 	printError(err)
@@ -475,7 +473,7 @@ func initReply(addr string, seq uint16, payload []byte) {
 	var newMember Member
 	deserialize(payload, &newMember)
 	MyList.Insert(&newMember)
-	addUpdateToCache(&newMember, MemUpdateJoin, TimeToLive+4) // Update this new member's join
+	addUpdateToCache(&newMember, MemUpdateJoin, TimeToLive+3) // Update this new member's join
 
 	// Put the entire memberlist to the Init Reply's payload
 	var memBuffer bytes.Buffer // Temp buf to store member's binary value
