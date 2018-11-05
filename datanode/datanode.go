@@ -511,6 +511,7 @@ func detectMasterIP(dch chan string) {
 
 		case mip := <-dch:
 			masterIP = mip
+			fmt.Printf("master IP change to %s\n", masterIP)
 
 		default:
 		}

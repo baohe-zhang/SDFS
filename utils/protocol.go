@@ -44,6 +44,8 @@ type PutResponse struct {
 }
 
 type PutConfirm struct {
+	MsgType  uint8
+	Filename [128]byte
 }
 
 type WriteRequest struct {
