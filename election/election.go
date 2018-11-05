@@ -64,7 +64,7 @@ func (e *Elector) handler(packet []byte, addr *net.UDPAddr) {
 	if packet[0] == Election {
 		if e.NodeID.IP > utils.BinaryIP(addr.IP.String()) {
 			sendUDP(addr.IP.String() + ":" + ElectionPort, []byte{OK})
-			e.election()
+			e.Election()
 		}
 
 	} else if packet[0] == OK {
@@ -82,7 +82,7 @@ func (e *Elector) handler(packet []byte, addr *net.UDPAddr) {
 }
 
 // Initiate an election when the node detects the master failed
-func (e *Elector) election() {
+func (e *Elector) Election() {
 	for i := 0; i < e.MemberList.Size(); i++ {
 		member := e.MemberList.Members[i]
 		if e.NodeID.IP < member.IP {
@@ -95,11 +95,11 @@ func (e *Elector) election() {
 	go func() {
 		<-elecTimer.C
 		fmt.Printf("%s elected as the master", utils.StringIP(e.NodeID.IP))
-		e.coordination()
+		e.Coordination()
 	}()
 }
 
-func (e *Elector) coordination() {
+func (e *Elector) Coordination() {
 	for i := 0; i < e.MemberList.Size(); i++ {
 		member := e.MemberList.Members[i]
 		sendUDP(utils.StringIP(member.IP) + ":" + ElectionPort, []byte{Coordinator})
