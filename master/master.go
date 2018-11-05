@@ -308,7 +308,6 @@ func (mn *masterNode) ReReplicaRequest(rrr utils.ReReplicaRequest, addr string) 
 func (mn *masterNode) Handle(conn net.Conn) {
 	buf := make([]byte, 4096)
 	n, err := conn.Read(buf)
-	fmt.Println(n)
 	utils.PrintError(err)
 
 	switch buf[0] {
