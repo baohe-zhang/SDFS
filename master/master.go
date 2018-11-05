@@ -7,11 +7,15 @@ import (
 	"simpledfs/membership"
 	"simpledfs/utils"
 	"time"
+	"sync"
 )
 
 var meta utils.Meta
 
 var hashtextToFilenameMap map[string]string
+var writeConfirmCountMap map[uint64]int
+var mutex sync.Mutex
+var wg sync.WaitGroup
 
 type masterNode struct {
 	Port       string
@@ -56,11 +60,48 @@ func (mn *masterNode) HandlePutRequest(prMsg utils.PutRequest, conn net.Conn) {
 
 	info := utils.Info{Timestamp: pr.Timestamp, Filesize: pr.Filesize, DataNodes: pr.DataNodeList[:]}
 	meta.PutFileInfo(utils.Hash2Text(pr.FilenameHash[:]), info)
+
+	wg.Add(1)
+	wg.Wait() // Reply client a put confirm until the master receives 4 wirte confirm from datanodes
+
+	pc := utils.PutConfirm{
+		MsgType: utils.PutConfirmMsg,
+		Filename: prMsg.Filename,
+	}
+
+	conn.Write(utils.Serialize(pc))
+
 	return
 }
 
 func (mn *masterNode) HandleWriteConfirm(wcMsg utils.WriteConfirm, conn net.Conn) {
+	filename := hashtextToFilenameMap[utils.Hash2Text(wcMsg.FilenameHash[:])]
+	timestamp := wcMsg.Timestamp
+	nid := wcMsg.DataNode
 
+	mutex.Lock()
+	_, exist := writeConfirmCountMap[timestamp]
+	mutex.Unlock()
+	if !exist {
+		mutex.Lock()
+		writeConfirmCountMap[timestamp] = 1
+		mutex.Unlock()
+	} else {
+		mutex.Lock()
+		writeConfirmCountMap[timestamp] += 1
+		mutex.Unlock()
+	}
+
+	fmt.Printf("%s stored file %s with ts %s\n", utils.StringIP(nid.IP), filename, timestamp)
+
+	if writeConfirmCountMap[timestamp] >= 4 {
+		mutex.Lock()
+		delete(writeConfirmCountMap, timestamp)
+		mutex.Unlock()
+		
+		// notify HandlePutRequest to send PutConfirm to client
+		wg.Done()
+	}
 }
 
 func (mn *masterNode) HandleGetRequest(grMsg utils.GetRequest, conn net.Conn) {

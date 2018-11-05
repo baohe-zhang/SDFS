@@ -148,7 +148,20 @@ func putCommand(masterConn net.Conn, sdfsfile string, filesize uint64, localfile
 	}
 	fmt.Printf("%s %d %v\n", utils.Hash2Text(response.FilenameHash[:]), response.Timestamp, response.DataNodeList)
 
-	filePut(response, localfile)
+	go filePut(response, localfile)
+
+	// Read Put Confirm
+	buf = make([]byte, BufferSize)
+	n, err = masterConn.Read(buf)
+	printErrorExit(err)
+
+	pc := utils.PutConfirm{}
+	utils.Deserialize(buf[:n], &pc)
+	if response.MsgType != utils.PutConfirmMsg {
+		fmt.Println("Unexpected message from MasterNode")
+		return
+	}
+	fmt.Printf("[put confirm from master] %s put finished\n", utils.ParseFilename(pc.Filename[:]))
 }
 
 // Get command execution for simpleDFS client

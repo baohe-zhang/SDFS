@@ -15,6 +15,7 @@ import (
 )
 
 var meta utils.Meta
+var masterIP string
 
 const (
 	BufferSize = 4096
@@ -297,7 +298,7 @@ func (dn *dataNode) fileReader(conn net.Conn, wr utils.WriteRequest) {
 		fmt.Printf("put %s with ts %d into meta list\n", hashFilename, wr.Timestamp)
 
 		// Tell master it receives a file
-		// dialMasterNode()
+		dn.dialMasterNode(wr.FilenameHash, wr.Filesize, wr.Timestamp)
 	}
 }
 
@@ -400,8 +401,8 @@ func (dn *dataNode) fileVersionWriter(conn net.Conn, rvr utils.ReadVersionReques
 
 }
 
-func (dn *dataNode) dialMasterNode(masterID uint8, filenameHash [32]byte, filesize uint64, timestamp uint64) {
-	conn, err := net.Dial("tcp", ":8000")
+func (dn *dataNode) dialMasterNode(filenameHash [32]byte, filesize uint64, timestamp uint64) {
+	conn, err := net.Dial("tcp", masterIP + ":" + "5000")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
@@ -504,8 +505,23 @@ func (dn *dataNode) getNexthopIDCircle(nodeList []utils.NodeID) (utils.NodeID, e
 	return utils.NodeID{}, errors.New("Nexthop doesn't exists")
 }
 
-func (dn *dataNode) Start() {
+func detectMasterIP(dch chan string) {
+	for {
+		select {
+
+		case mip := <-dch:
+			masterIP = mip
+
+		default:
+		}
+	}
+}
+
+func (dn *dataNode) Start(msip string, dch chan string) {
+	masterIP = msip
 	meta = utils.NewMeta("meta.json")
+
+	go detectMasterIP(dch)
 
 	dn.Listener()
 }

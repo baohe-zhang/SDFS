@@ -14,9 +14,10 @@ import (
 
 var masterIP string
 
-func detector(elector *election.Elector, tch chan uint64, ich chan uint32, mch chan uint32) {
+func detector(elector *election.Elector, tch chan uint64, ich chan uint32, mch chan uint32, dch chan string) {
 	for {
 		select {
+
 		case <-tch:
 			ip := <-ich
 			fmt.Printf("node %s failed\n", utils.StringIP(ip))
@@ -28,8 +29,10 @@ func detector(elector *election.Elector, tch chan uint64, ich chan uint32, mch c
 		case mip := <-mch:
 			fmt.Printf("daemon has new master ip %s\n", utils.StringIP(mip))
 			masterIP = utils.StringIP(mip)
+			dch <- masterIP
 
 		default:
+
 		}
 	}
 }
@@ -50,6 +53,7 @@ func main() {
 	tsch := make(chan uint64) // channel to notify node failure
 	ipch := make(chan uint32)
 	msch := make(chan uint32) // channel to notify new master
+	dnch := make(chan string) // channel to notify data node the new master
 
 	// remove all replica files when rejoin
 	files, err := filepath.Glob("./*:*")
@@ -73,14 +77,15 @@ func main() {
 		masterNode := master.NewMasterNode(fmt.Sprintf("%d", masternodePort), uint16(datanodePort), membership.MyList)
 		go masterNode.Start()
 	}
+	
 	nodeID := utils.NodeID{Timestamp: membership.MyMember.Timestamp, IP: membership.MyMember.IP}
 	node := datanode.NewDataNode(fmt.Sprintf("%d", datanodePort), membership.MyList, nodeID)
-	go node.Start()
+	go node.Start(masterIP, dnch)
 
 	elector := election.NewElector(nodeID, membership.MyList)
 	go elector.Start("5003", msch)
 
-	go detector(elector, tsch, ipch, msch)
+	go detector(elector, tsch, ipch, msch, dnch)
 
 	membership.Start(masterIP, fmt.Sprintf("%d", membershipPort), tsch, ipch)
 }
