@@ -383,6 +383,7 @@ func main() {
 	command := args[0]
 	switch command {
 	case "put":
+		fmt.Printf("[%s] put start\n", time.Now())
 		if len(args) != 3 {
 			fmt.Println("Invalid put usage")
 			usage()
@@ -397,7 +398,10 @@ func main() {
 		}
 		fmt.Println(filenode.Size(), sdfsfile)
 		putCommand(masterConn, sdfsfile, uint64(filenode.Size()), localfile)
+		fmt.Printf("[%s] put finish\n", time.Now())
+
 	case "get":
+		fmt.Printf("[%s] get start\n", time.Now())
 		if len(args) != 3 {
 			fmt.Println("Invalid get usage")
 			usage()
@@ -406,7 +410,10 @@ func main() {
 		sdfsfile := args[1]
 		localfile := args[2]
 		getCommand(masterConn, sdfsfile, localfile)
+		fmt.Printf("[%s] get finish\n", time.Now())
+
 	case "delete":
+		fmt.Printf("[%s] delete start\n", time.Now())
 		if len(args) != 2 {
 			fmt.Println("Invalid delete usage")
 			usage()
@@ -414,7 +421,10 @@ func main() {
 		fmt.Println(args[1:])
 		sdfsfile := args[1]
 		deleteCommand(masterConn, sdfsfile)
+		fmt.Printf("[%s] delete finish\n", time.Now())
+
 	case "ls":
+		fmt.Printf("[%s] ls start\n", time.Now())
 		if len(args) != 2 {
 			fmt.Println("Invalid ls usage")
 			usage()
@@ -422,13 +432,19 @@ func main() {
 		fmt.Println(args[1:])
 		sdfsfile := args[1]
 		lsCommand(masterConn, sdfsfile)
+		fmt.Printf("[%s] ls finish\n", time.Now())
+
 	case "store":
+		fmt.Printf("[%s] store start\n", time.Now())
 		if len(args) != 1 {
 			fmt.Println("Invalid store usage")
 			usage()
 		}
 		storeCommand(masterConn)
+		fmt.Printf("[%s] store finish\n", time.Now())
+
 	case "get-versions":
+		fmt.Printf("[%s] get-versions start\n", time.Now())
 		if len(args) != 4 {
 			fmt.Println("Invalid get-versions usage")
 			usage()
@@ -443,6 +459,8 @@ func main() {
 		}
 		localfile := args[3]
 		getVersionsCommand(masterConn, numInt, sdfsfile, localfile)
+		fmt.Printf("[%s] get-versions finish\n", time.Now())
+
 	default:
 		usage()
 	}
