@@ -13,14 +13,26 @@ import (
 func detectNodeFailure(elector *election.Elector, tch chan uint64, ich chan uint32) {
 	for {
 		select {
-		case <-tch:
-			ip := <-ich
-			fmt.Printf("node %s failed\n", utils.StringIP(ip))
-			if utils.StringIP(ip) == "172.22.156.95" {
-				fmt.Printf("master failed. election start\n")
-				elector.Election()
-			}
-		default:
+			case <-tch:
+				ip := <-ich
+				fmt.Printf("node %s failed\n", utils.StringIP(ip))
+				if utils.StringIP(ip) == "172.22.156.95" {
+					fmt.Printf("master failed. election start\n")
+					elector.Election()
+				}
+
+			default:
+		}
+	}
+}
+
+func detectNewMaster(mch chan uint32) {
+	for {
+		select {
+			case mip := <-mch:
+				fmt.Printf("daemon has new master ip %s\n", utils.StringIP(mip))
+
+			default:
 		}
 	}
 }
@@ -40,6 +52,7 @@ func main() {
 
 	tsch := make(chan uint64) // channel to notify node failure
 	ipch := make(chan uint32)
+	msch := make(chan uint32) // channel to notify new master
 
 
 	if membership.Initilize() == true {
@@ -55,9 +68,10 @@ func main() {
 	go node.Start()
 
 	elector := election.NewElector(nodeID, membership.MyList)
-	go elector.Start("5003")
+	go elector.Start("5003", msch) 
 
 	go detectNodeFailure(elector, tsch, ipch)
+	go detectNewMaster(msch)
 
 	membership.Start(masterIP, fmt.Sprintf("%d", membershipPort), tsch, ipch)
 }

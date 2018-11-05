@@ -14,6 +14,7 @@ const (
 
 var ElectionPort string
 var elecTimer *time.Timer
+var msch chan uint32
 
 type Elector struct {
 	NodeID     utils.NodeID
@@ -71,6 +72,8 @@ func (e *Elector) handler(packet []byte, addr *net.UDPAddr) {
 
 	} else if string(packet[:]) == "coordinator" {
 		fmt.Printf("%s becomes new master\n", addr.IP.String())
+		// Code to notify other rotine the new master
+		msch <- utils.BinaryIP(addr.IP.String())
 
 	} else {
 		fmt.Println("[electon] unknown packet")
@@ -103,8 +106,9 @@ func (e *Elector) Coordination() {
 	}
 }
 
-func (e *Elector) Start(port string) {
+func (e *Elector) Start(port string, mch chan uint32) {
 	ElectionPort = port
+	msch = mch
 	fmt.Println("elector start")
 	e.listener()
 }
