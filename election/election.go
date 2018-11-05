@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	ElecTimeoutPeriod = 3000 * time.Millisecond
+	ElecTimeoutPeriod = 5000 * time.Millisecond
 )
 
 var ElectionPort string
@@ -67,11 +67,11 @@ func (e *Elector) handler(packet []byte, addr *net.UDPAddr) {
 	} else if string(packet[:]) == "ok" {
 		stop := elecTimer.Stop()
 		if stop {
-			fmt.Printf("%s has higher IP, %s's election stops", addr.IP.String(), utils.StringIP(e.NodeID.IP))
+			fmt.Printf("%s has higher IP, %s's election stops\n", addr.IP.String(), utils.StringIP(e.NodeID.IP))
 		}
 
 	} else if string(packet[:]) == "coordinator" {
-		fmt.Printf("%s becomes new master", addr.IP.String())
+		fmt.Printf("%s becomes new master\n", addr.IP.String())
 
 	} else {
 		fmt.Println("[electon] unknown packet")
@@ -83,6 +83,7 @@ func (e *Elector) Election() {
 	for i := 0; i < e.MemberList.Size(); i++ {
 		member := e.MemberList.Members[i]
 		if e.NodeID.IP < member.IP {
+			fmt.Printf("send election to %s", utils.StringIP(member.IP))
 			sendUDP(utils.StringIP(member.IP) + ":" + ElectionPort, []byte("election"))
 		}
 	}
@@ -91,7 +92,7 @@ func (e *Elector) Election() {
 	elecTimer = time.NewTimer(ElecTimeoutPeriod)
 	go func() {
 		<-elecTimer.C
-		fmt.Printf("%s elected as the master", utils.StringIP(e.NodeID.IP))
+		fmt.Printf("%s elected as the master\n", utils.StringIP(e.NodeID.IP))
 		e.Coordination()
 	}()
 }
