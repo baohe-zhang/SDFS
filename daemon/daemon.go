@@ -3,11 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
 	"simpledfs/datanode"
+	"simpledfs/election"
 	"simpledfs/master"
 	"simpledfs/membership"
 	"simpledfs/utils"
-	"simpledfs/election"
 )
 
 var masterIP string
@@ -15,23 +17,22 @@ var masterIP string
 func detector(elector *election.Elector, tch chan uint64, ich chan uint32, mch chan uint32) {
 	for {
 		select {
-			case <-tch:
-				ip := <-ich
-				fmt.Printf("node %s failed\n", utils.StringIP(ip))
-				if utils.StringIP(ip) == masterIP {
-					fmt.Printf("master failed. election start\n")
-					elector.Election()
-				}
+		case <-tch:
+			ip := <-ich
+			fmt.Printf("node %s failed\n", utils.StringIP(ip))
+			if utils.StringIP(ip) == masterIP {
+				fmt.Printf("master failed. election start\n")
+				elector.Election()
+			}
 
-			case mip := <-mch:
-				fmt.Printf("daemon has new master ip %s\n", utils.StringIP(mip))
-				masterIP = utils.StringIP(mip)
+		case mip := <-mch:
+			fmt.Printf("daemon has new master ip %s\n", utils.StringIP(mip))
+			masterIP = utils.StringIP(mip)
 
-			default:
+		default:
 		}
 	}
 }
-
 
 func main() {
 	masterIpPtr := flag.String("master", "127.0.0.1", "Master's IP")
@@ -50,9 +51,22 @@ func main() {
 	ipch := make(chan uint32)
 	msch := make(chan uint32) // channel to notify new master
 
+	// remove all replica files when rejoin
+	files, err := filepath.Glob("./*:*")
+	if err != nil {
+		panic(err)
+	}
+	for _, f := range files {
+		if err := os.Remove(f); err != nil {
+			panic(err)
+		}
+	}
 
 	if membership.Initilize() == true {
 		fmt.Printf("[INFO]: Start service\n")
+	} else {
+		fmt.Printf("[ERROR]: Start service fail\n")
+		return
 	}
 
 	if masterIP == localIP {
@@ -64,7 +78,7 @@ func main() {
 	go node.Start()
 
 	elector := election.NewElector(nodeID, membership.MyList)
-	go elector.Start("5003", msch) 
+	go elector.Start("5003", msch)
 
 	go detector(elector, tsch, ipch, msch)
 
