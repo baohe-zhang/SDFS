@@ -95,7 +95,7 @@ func (mn *masterNode) HandleWriteConfirm(wcMsg utils.WriteConfirm, conn net.Conn
 
 	fmt.Printf("%s stored file %s with ts %d\n", utils.StringIP(nid.IP), filename, timestamp)
 
-	if writeConfirmCountMap[timestamp] >= 4 || writeConfirmCountMap[timestamp] >= mn.MemberList.Size() {
+	if writeConfirmCountMap[timestamp] >= 4 {
 		mutex.Lock()
 		delete(writeConfirmCountMap, timestamp)
 		mutex.Unlock()
