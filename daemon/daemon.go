@@ -15,7 +15,11 @@ func detectNodeFailure(elector *election.Elector, tch chan uint64, ich chan uint
 		select {
 		case <-tch:
 			ip := <-ich
-			fmt.Printf("node %s with failed\n", utils.StringIP(ip))
+			fmt.Printf("node %s failed\n", utils.StringIP(ip))
+			if ip == utils.BinaryIP("172.22.156.95") {
+				fmt.Printf("master failed. election start")
+				elector.election()
+			}
 		default:
 		}
 	}
