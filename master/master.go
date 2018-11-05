@@ -95,7 +95,7 @@ func (mn *masterNode) HandleWriteConfirm(wcMsg utils.WriteConfirm, conn net.Conn
 
 	fmt.Printf("%s stored file %s with ts %d\n", utils.StringIP(nid.IP), filename, timestamp)
 
-	if writeConfirmCountMap[timestamp] >= 4 {
+	if writeConfirmCountMap[timestamp] >= 4 || writeConfirmCountMap[timestamp] >= mn.MemberList.Size() {
 		mutex.Lock()
 		delete(writeConfirmCountMap, timestamp)
 		mutex.Unlock()
@@ -250,46 +250,54 @@ func (mn *masterNode) HandleStoreRequest(srMsg utils.StoreRequest, conn net.Conn
 
 // Re-replica go routine for consistently check if a file has kept in four replica
 // Send the re-replica request to a node who has this file and pipeline the checking
-func (mn *masterNode) ReReplicaRoutine() {
+// Use channel to notify the master when there is a node failure
+func (mn *masterNode) ReReplicaRoutine(dfch chan uint32) {
 	for {
-		for file, infos := range meta {
-			filename := hashtextToFilenameMap[file]
-			for _, info := range infos {
-				dataNodes := info.DataNodes
-				rrr := utils.ReReplicaRequest{
-					MsgType:      utils.ReReplicaRequestMsg,
-					FilenameHash: utils.HashFilename(filename),
-					Timestamp:    info.Timestamp,
-					TimeToLive:   4,
-				}
+		select {
 
-				ids := make([]utils.NodeID, 0)
-				for _, id := range dataNodes {
-					_, err := mn.MemberList.Retrieve(id.Timestamp, id.IP)
-					if err != nil {
-						utils.PrintError(err)
+		case nip := <-dfch:
+			fmt.Printf("data node %s failed, re-replica start\n", utils.StringIP(nip))
+			for file, infos := range meta {
+				filename := hashtextToFilenameMap[file]
+				for _, info := range infos {
+					dataNodes := info.DataNodes
+					rrr := utils.ReReplicaRequest{
+						MsgType:      utils.ReReplicaRequestMsg,
+						FilenameHash: utils.HashFilename(filename),
+						Timestamp:    info.Timestamp,
+						TimeToLive:   4,
+					}
+
+					ids := make([]utils.NodeID, 0)
+					for _, id := range dataNodes {
+						_, err := mn.MemberList.Retrieve(id.Timestamp, id.IP)
+						if err != nil {
+							utils.PrintError(err)
+							continue
+						}
+						ids = append(ids, id)
+					}
+
+					if len(ids) < utils.NumReplica && mn.MemberList.Size() >= utils.NumReplica {
+						picksID := mn.pickReceivers(ids, utils.NumReplica-len(ids))
+						for i := 0; i < utils.NumReplica; i++ {
+							if i < len(ids) {
+								rrr.DataNodeList[i] = ids[i]
+							} else {
+								rrr.DataNodeList[i] = picksID[i-len(ids)]
+							}
+						}
+					} else {
 						continue
 					}
-					ids = append(ids, id)
-				}
+					fmt.Println(rrr.DataNodeList)
 
-				if len(ids) < utils.NumReplica && mn.MemberList.Size() >= utils.NumReplica {
-					picksID := mn.pickReceivers(ids, utils.NumReplica-len(ids))
-					for i := 0; i < utils.NumReplica; i++ {
-						if i < len(ids) {
-							rrr.DataNodeList[i] = ids[i]
-						} else {
-							rrr.DataNodeList[i] = picksID[i-len(ids)]
-						}
-					}
-				} else {
-					continue
+					mn.ReReplicaRequest(rrr, utils.StringIP(ids[0].IP)+":"+utils.StringPort(mn.DNPort))
+					meta.UpdateFileInfo(utils.Hash2Text(rrr.FilenameHash[:]), rrr.DataNodeList[:])
 				}
-				fmt.Println(rrr.DataNodeList)
-
-				mn.ReReplicaRequest(rrr, utils.StringIP(ids[0].IP)+":"+utils.StringPort(mn.DNPort))
-				meta.UpdateFileInfo(utils.Hash2Text(rrr.FilenameHash[:]), rrr.DataNodeList[:])
 			}
+
+		default:
 		}
 	}
 }
@@ -381,7 +389,7 @@ func (mn *masterNode) pickReceivers(fileHolders []utils.NodeID, num int) []utils
 	return receivers
 }
 
-func (mn *masterNode) Start() {
+func (mn *masterNode) Start(dfch chan uint32) {
 	//meta = utils.NewMeta("MasterMeta")
 	meta = utils.Meta{}
 	hashtextToFilenameMap = make(map[string]string)
@@ -392,7 +400,8 @@ func (mn *masterNode) Start() {
 		utils.PrintError(err)
 		return
 	}
-	go mn.ReReplicaRoutine()
+
+	go mn.ReReplicaRoutine(dfch) // detect node failure and start re-replica
 
 	for {
 		conn, err := listener.Accept()
