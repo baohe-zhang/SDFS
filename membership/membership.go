@@ -505,7 +505,7 @@ func initRequest(member *Member) {
 
 func initiateLeave() {
 	uid := UpdateCacheList.RandGen.Uint64()
-	update := Update{uid, TimeToLive, MemUpdateLeave, MyMember.Timestamp, MyMember.IP, MyMember.State}
+	update := Update{uid, TimeToLive+5, MemUpdateLeave, MyMember.Timestamp, MyMember.IP, MyMember.State}
 	// Clear current update cache list and add delete update to the cache
 	UpdateCacheList = NewTtlCache()
 	UpdateCacheList.Set(&update)
