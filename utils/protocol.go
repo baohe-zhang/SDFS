@@ -24,6 +24,7 @@ const (
 	GetVersionsRequestMsg  = 18
 	GetVersionsResponseMsg = 19
 	ReadVersionRequestMsg  = 20
+	RmRequestMsg           = 21
 )
 
 type PutRequest struct {
@@ -75,6 +76,11 @@ type GetResponse struct {
 }
 
 type ReadRequest struct {
+	MsgType      uint8
+	FilenameHash [32]byte
+}
+
+type RmRequest struct {
 	MsgType      uint8
 	FilenameHash [32]byte
 }

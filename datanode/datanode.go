@@ -11,6 +11,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 var meta utils.Meta
@@ -77,14 +78,39 @@ func (dn *dataNode) Handler(conn net.Conn) {
 
 		dn.reReplicaStat(conn, msg)
 	} else if buf[0] == utils.ReadVersionRequestMsg {
-		// Receive read request from client
+		// Receive read version request from client
 		fmt.Println("Receive read version request")
 		msg := utils.ReadVersionRequest{}
 		utils.Deserialize(buf[:n], &msg)
 
 		dn.fileVersionWriter(conn, msg)
+	} else if buf[0] == utils.RmRequestMsg {
+		// Receive delete request from client
+		fmt.Println("Receive delete request")
+		msg := utils.RmRequest{}
+		utils.Deserialize(buf[:n], &msg)
+
+		dn.fileDeletor(conn, msg)
 	}
 
+}
+
+// Handle Remove Request message from master
+func (dn *dataNode) fileDeletor(conn net.Conn, rrMsg utils.RmRequest) {
+	hashFilename := utils.Hash2Text(rrMsg.FilenameHash[:])
+	_, ok := meta.RmFileInfo(hashFilename)
+	if ok {
+		// remove replica all its versions when rejoin
+		files, err := filepath.Glob("./" + hashFilename + ":*")
+		if err != nil {
+			utils.PrintError(err)
+		}
+		for _, f := range files {
+			if err := os.Remove(f); err != nil {
+				utils.PrintError(err)
+			}
+		}
+	}
 }
 
 // Handle Re-Replica Request message from master or peer datanode
@@ -267,7 +293,7 @@ func (dn *dataNode) fileReader(conn net.Conn, wr utils.WriteRequest) {
 			DataNodes: wr.DataNodeList[:],
 		}
 		meta.PutFileInfo(hashFilename, info)
-		meta.StoreMeta("meta.json")
+		//meta.StoreMeta("meta.json")
 		fmt.Printf("put %s with ts %d into meta list\n", hashFilename, wr.Timestamp)
 
 		// Tell master it receives a file

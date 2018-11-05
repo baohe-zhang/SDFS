@@ -141,14 +141,34 @@ func (mn *masterNode) HandleDeleteRequest(drMsg utils.DeleteRequest, conn net.Co
 	filename := utils.ParseFilename(drMsg.Filename[:])
 	fmt.Println("filename ", filename)
 	filenameHash := utils.HashFilename(filename)
-	ok := meta.RmFileInfo(utils.Hash2Text(filenameHash[:]))
+	infos, ok := meta.RmFileInfo(utils.Hash2Text(filenameHash[:]))
 	dr := utils.DeleteResponse{MsgType: utils.DeleteResponseMsg, IsSuccess: ok}
-
 	bin := utils.Serialize(dr)
 	conn.Write(bin)
-	return
+
+	ids := make(map[utils.NodeID]int, 0)
+	for _, info := range infos {
+		nodes := info.DataNodes
+		for _, node := range nodes {
+			ids[node] = 1
+		}
+	}
+	for id, _ := range ids {
+		rr := utils.RmRequest{MsgType: utils.RmRequestMsg, FilenameHash: filenameHash}
+		mn.RmRequest(rr, utils.StringIP(id.IP)+":"+utils.StringPort(mn.DNPort))
+	}
 }
 
+func (mn *masterNode) RmRequest(rr utils.RmRequest, addr string) {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		utils.PrintError(err)
+		fmt.Println("Failed to connect Delete datanode")
+		return
+	}
+
+	conn.Write(utils.Serialize(rr))
+}
 func (mn *masterNode) HandleListRequest(lrMsg utils.ListRequest, conn net.Conn) {
 	filename := utils.ParseFilename(lrMsg.Filename[:])
 	fmt.Println("filename ", filename)

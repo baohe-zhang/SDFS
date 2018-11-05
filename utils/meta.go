@@ -112,13 +112,13 @@ func (meta Meta) UpdateFileInfoWithTs(filename string, dataNodeList []NodeID, ts
 	}
 }
 
-func (meta Meta) RmFileInfo(filename string) bool {
-	_, ok := meta[filename]
+func (meta Meta) RmFileInfo(filename string) (Infos, bool) {
+	infos, ok := meta[filename]
 	if ok {
 		delete(meta, filename)
-		return true
+		return infos, true
 	}
-	return false
+	return Infos{}, false
 }
 
 func (meta Meta) FilesIn(clientIP uint32) []string {
