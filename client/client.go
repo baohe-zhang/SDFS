@@ -157,7 +157,7 @@ func putCommand(masterConn net.Conn, sdfsfile string, filesize uint64, localfile
 
 	pc := utils.PutConfirm{}
 	utils.Deserialize(buf[:n], &pc)
-	if response.MsgType != utils.PutConfirmMsg {
+	if pc.MsgType != utils.PutConfirmMsg {
 		fmt.Println("Unexpected message from MasterNode")
 		return
 	}
