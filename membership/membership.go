@@ -66,6 +66,9 @@ var Logger *ssmsLogger
 var wg sync.WaitGroup // Block goroutines until user type join
 var mutex sync.Mutex  // Mutex used for duplicate update caches write
 
+var tsch chan uint64
+var ipch chan uint32
+
 // Convert struct to byte array
 func serialize(data interface{}) []byte {
 	buf := bytes.Buffer{}
@@ -397,6 +400,8 @@ func handleSuspect(payload []byte) {
 			err := MyList.Delete(update.MemberTimestamp, update.MemberIP)
 			if err == nil {
 				Logger.Info("[Failure Detected](%s, %d) Failed, detected by suspect update\n", int2ip(update.MemberIP).String(), update.MemberTimestamp)
+				tsch <- update.MemberTimestamp
+				ipch <- update.MemberIP
 			}
 			delete(FailureTimerMap, [2]uint64{update.MemberTimestamp, uint64(update.MemberIP)})
 		}()
@@ -434,7 +439,12 @@ func handleLeave(payload []byte) {
 
 	updateID := update.UpdateID
 	if !isUpdateDuplicate(updateID) {
-		MyList.Delete(update.MemberTimestamp, update.MemberIP)
+		err := MyList.Delete(update.MemberTimestamp, update.MemberIP)
+		if err == nil {
+			Logger.Info("(%s, %d) leave the system, detected by levae update\n", int2ip(update.MemberIP).String(), update.MemberTimestamp)
+			tsch <- update.MemberTimestamp
+			ipch <- update.MemberIP		
+		}
 		UpdateCacheList.Set(&update)
 	}
 }
@@ -573,7 +583,9 @@ func pingWithPayload(member *Member, payload []byte, flag uint8) {
 				<-failureTimer.C
 				err := MyList.Delete(member.Timestamp, member.IP)
 				if err == nil {
-					Logger.Info("[Failure Detected](%s, %d) Failed, detected by self\n", int2ip(member.IP).String(), member.Timestamp)
+					Logger.Info("[Failure Detected](%s, %d) Failed, detected by me\n", int2ip(member.IP).String(), member.Timestamp)
+					tsch <- member.Timestamp
+					ipch <- member.IP
 				}
 				delete(FailureTimerMap, [2]uint64{member.Timestamp, uint64(member.IP)})
 			}()
@@ -608,9 +620,12 @@ func Initilize() bool {
 }
 
 // Main func
-func Start(introducerIP, port string) {
+func Start(introducerIP, port string, tch chan uint64, ich chan uint32) {
 	IntroducerIP = introducerIP
 	MembershipPort = ":" + port
+
+	tsch = tch
+	ipch = ich
 
 	// Start daemon
 	daemon()

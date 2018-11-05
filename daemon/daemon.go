@@ -10,6 +10,17 @@ import (
 	"simpledfs/election"
 )
 
+func detectNodeFailure(elector *election.Elector, tch chan uint64, ich chan uint32) {
+	for {
+		select {
+		case <-tch:
+			ip := <-ich
+			fmt.Printf("node %s with failed\n", utils.StringIP(ip))
+		default:
+		}
+	}
+}
+
 func main() {
 	masterIpPtr := flag.String("master", "127.0.0.1", "Master's IP")
 	masternodePortPtr := flag.Int("mn-port", 5000, "MasterNode serving port")
@@ -22,6 +33,10 @@ func main() {
 	datanodePort := *datanodePortPtr
 	masterIP = utils.LookupIP(masterIP)
 	localIP := utils.GetLocalIP().String()
+
+	tsch := make(chan uint64) // channel to notify node failure
+	ipch := make(chan uint32)
+
 
 	if membership.Initilize() == true {
 		fmt.Printf("[INFO]: Start service\n")
@@ -38,5 +53,7 @@ func main() {
 	elector := election.NewElector(nodeID, membership.MyList)
 	go elector.Start("5003")
 
-	membership.Start(masterIP, fmt.Sprintf("%d", membershipPort))
+	go detectNodeFailure(elector, tsch, ipch)
+
+	membership.Start(masterIP, fmt.Sprintf("%d", membershipPort), tsch, ipch)
 }
