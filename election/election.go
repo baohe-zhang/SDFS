@@ -9,9 +9,6 @@ import (
 )
 
 const (
-	Election          = 1
-	OK                = 2
-	Coordinator       = 3
 	ElecTimeoutPeriod = 3000 * time.Millisecond
 )
 
@@ -61,19 +58,19 @@ func (e *Elector) listener() {
 }
 
 func (e *Elector) handler(packet []byte, addr *net.UDPAddr) {
-	if packet[0] == Election {
+	if string(packet[:]) == "election" {
 		if e.NodeID.IP > utils.BinaryIP(addr.IP.String()) {
-			sendUDP(addr.IP.String() + ":" + ElectionPort, []byte{OK})
+			sendUDP(addr.IP.String() + ":" + ElectionPort, []byte("ok"))
 			e.Election()
 		}
 
-	} else if packet[0] == OK {
+	} else if string(packet[:]) == "ok" {
 		stop := elecTimer.Stop()
 		if stop {
 			fmt.Printf("%s has higher IP, %s's election stops", addr.IP.String(), utils.StringIP(e.NodeID.IP))
 		}
 
-	} else if packet[0] == Coordinator {
+	} else if string(packet[:]) == "coordinator" {
 		fmt.Printf("%s becomes new master", addr.IP.String())
 
 	} else {
@@ -86,7 +83,7 @@ func (e *Elector) Election() {
 	for i := 0; i < e.MemberList.Size(); i++ {
 		member := e.MemberList.Members[i]
 		if e.NodeID.IP < member.IP {
-			sendUDP(utils.StringIP(member.IP) + ":" + ElectionPort, []byte{Election})
+			sendUDP(utils.StringIP(member.IP) + ":" + ElectionPort, []byte("election"))
 		}
 	}
 
@@ -102,7 +99,7 @@ func (e *Elector) Election() {
 func (e *Elector) Coordination() {
 	for i := 0; i < e.MemberList.Size(); i++ {
 		member := e.MemberList.Members[i]
-		sendUDP(utils.StringIP(member.IP) + ":" + ElectionPort, []byte{Coordinator})
+		sendUDP(utils.StringIP(member.IP) + ":" + ElectionPort, []byte("coordinator"))
 	}
 }
 
