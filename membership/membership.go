@@ -636,6 +636,7 @@ func Initilize() bool {
 
 // Main func
 func Start(introducerIP, port string, tch chan uint64, ich chan uint32) {
+	fmt.Println("membership service start")
 	IntroducerIP = introducerIP
 	MembershipPort = ":" + port
 

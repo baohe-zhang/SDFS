@@ -109,6 +109,6 @@ func (e *Elector) Coordination() {
 func (e *Elector) Start(port string, mch chan uint32) {
 	ElectionPort = port
 	msch = mch
-	fmt.Println("elector start")
+	fmt.Println("election service start")
 	e.listener()
 }
