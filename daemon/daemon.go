@@ -56,10 +56,10 @@ func main() {
 	localIP := utils.GetLocalIP().String()
 
 	tsch := make(chan uint64) // channel for membership to notify deamon the failure node's timestamp
-	ipch := make(chan uint32) // channel for membership to notify deamon the failure node's ip 
+	ipch := make(chan uint32) // channel for membership to notify deamon the failure node's ip
 	msch := make(chan uint32) // channel for elector to  notify daemon the new master's binary ip
 	dnch := make(chan string) // channel for daemon to notify data node the new master's string ip
-	dfch := make(chan uint32) // channel for daemon to notify master the failure node's ip 
+	dfch := make(chan uint32) // channel for daemon to notify master the failure node's ip
 
 	// remove all replica files when rejoin
 	files, err := filepath.Glob("./*:*")
@@ -73,9 +73,9 @@ func main() {
 	}
 
 	if membership.Initilize() == true {
-		fmt.Printf("[INFO]: Start service\n")
+		fmt.Printf("[INFO]: distibuted file system service start\n")
 	} else {
-		fmt.Printf("[ERROR]: Start service fail\n")
+		fmt.Printf("[ERROR]: distibuted file system service start failed\n")
 		return
 	}
 

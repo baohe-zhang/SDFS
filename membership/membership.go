@@ -124,16 +124,33 @@ func sendUDP(addr string, packet []byte) {
 	conn.Write(packet)
 }
 
-func daemon() {
-	cc := make(chan string)
-	go readCommand(cc)
-
-	// wg.Add(1) // Wait until user type join
-
+// Pass false to start non-interactive mode
+func daemon(isInteractive bool) {
 	go packetListenner() // Packet listening goroutine
 	go periodicPing()    // Packet sending goroutine
 
-	commandHandler(cc) // Client goroutine, listen to user's input
+	if isInteractive {
+		cc := make(chan string)
+		go readCommand(cc)
+		commandHandler(cc) // Client goroutine, listen to user's input
+	} else {
+		nonInteractiveJoin()
+	}
+}
+
+
+// Non-interactive start mode
+func nonInteractiveJoin() {
+	if MyIP == IntroducerIP {
+		MyMember.State |= (StateIntro | StateMonit)
+		MyList.Insert(MyMember)
+	} else {
+		initRequest(MyMember)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	wg.Wait()
 }
 
 // Concurrently read user input by chanel
@@ -625,6 +642,6 @@ func Start(introducerIP, port string, tch chan uint64, ich chan uint32) {
 	tsch = tch
 	ipch = ich
 
-	// Start daemon
-	daemon()
+	// Start daemon  hard-coding non interactive mode
+	daemon(false)
 }
